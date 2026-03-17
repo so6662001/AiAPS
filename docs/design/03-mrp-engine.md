@@ -1,6 +1,9 @@
 # AiAPS — MRP 展算引擎设计
 
-> 版本：1.0 | 最后更新：2026-03-17
+> 版本：2.0 | 最后更新：2026-03-17
+>
+> **重要：** MRP 引擎对品类 BOM 的展算逻辑增强、多阶段排产的衔接设计、
+> 以及原料驱动型排产（反向 MRP）请参见 **[08-steel-industry-adaptation.md](08-steel-industry-adaptation.md)** 第 6 节。
 
 ---
 

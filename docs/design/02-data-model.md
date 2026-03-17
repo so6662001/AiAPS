@@ -1,8 +1,12 @@
 # AiAPS — 数据模型设计（SQL Server 2008 兼容）
 
-> 版本：1.0 | 最后更新：2026-03-17
+> 版本：2.0 | 最后更新：2026-03-17
 >
 > 所有 DDL 严格兼容 SQL Server 2008，不使用 SEQUENCE、STRING_AGG、JSON 等高版本特性。
+>
+> **重要：** 本文档为基础版数据模型。钢铁行业深度适配（物料模型重构、品类BOM、
+> 套裁方案表等）的增量表设计请参见 **[08-steel-industry-adaptation.md](08-steel-industry-adaptation.md)**。
+> 08 文档中的表结构为增量设计，会替换/扩展本文档中对应的表。
 
 ---
 

@@ -38,3 +38,15 @@ AiAPS 是面向钢铁生产制造与加工行业的 MRP（物料需求计划）�
 | [05-frontend-design.md](docs/design/05-frontend-design.md) | 前端交互设计（Vue 3） |
 | [06-api-and-integration.md](docs/design/06-api-and-integration.md) | API 接口与系统集成 |
 | [07-implementation-roadmap.md](docs/design/07-implementation-roadmap.md) | 实施路线图与开发计划 |
+| **[08-steel-industry-adaptation.md](docs/design/08-steel-industry-adaptation.md)** | **钢铁行业深度适配（核心优化）** |
+
+### V2.0 核心优化 (08 文档)
+
+08 文档是对整体设计的重大优化，解决钢铁行业与传统离散 MRP 的根本性差异：
+
+- **物料模型重构**：物料 = 品类 + 规格，材质/产地剥离为库存批次属性
+- **双轨 BOM 体系**：品类 BOM（公式推算规格）+ 离散 BOM（精确展开）并存
+- **规格推算引擎**：方管/圆管/型材/折弯件等各品类的原料规格计算公式
+- **多阶段排产**：原料层排产（备料）→ 制造层排产（产线），管材先排带钢再排制管
+- **一分X 分剪排产**：钢卷纵切套裁优化，一个母卷分切多条带钢
+- **原料驱动排产**：行情好买入原料后，反向匹配可生产成品及需求
