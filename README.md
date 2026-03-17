@@ -44,6 +44,7 @@ AiAPS 是面向钢铁生产制造与加工行业的 MRP（物料需求计划）�
 | **[11-plan-schedule-modification.md](docs/design/11-plan-schedule-modification.md)** | **计划修改与排产修改完整设计** |
 | **[12-replenish-swap-reprocess.md](docs/design/12-replenish-swap-reprocess.md)** | **补料、换料与二次加工流程设计** |
 | **[13-grade-origin-substitute.md](docs/design/13-grade-origin-substitute.md)** | **材质与产地替代料深度设计** |
+| **[14-slitting-data-walkthrough.md](docs/design/14-slitting-data-walkthrough.md)** | **分剪业务全链路数据走查实例** |
 
 ### V2.0 核心优化 (08 文档)
 
