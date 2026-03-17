@@ -1,12 +1,15 @@
 # AiAPS — 数据模型设计（SQL Server 2008 兼容）
 
-> 版本：2.0 | 最后更新：2026-03-17
+> **版本：3.0（最终版）** | 最后更新：2026-03-17
 >
 > 所有 DDL 严格兼容 SQL Server 2008，不使用 SEQUENCE、STRING_AGG、JSON 等高版本特性。
 >
-> **重要：** 本文档为基础版数据模型。钢铁行业深度适配（物料模型重构、品类BOM、
-> 套裁方案表等）的增量表设计请参见 **[08-steel-industry-adaptation.md](08-steel-industry-adaptation.md)**。
-> 08 文档中的表结构为增量设计，会替换/扩展本文档中对应的表。
+> **V3.0 重大修正：** 本版本将 08/09/13 等文档中通过 ALTER TABLE 散落添加的字段
+> 全部合并到原始表定义中，确保所有核心业务表都包含 **材质(grade_code)、产地(origin_code)、
+> 重量(weight)** 字段。钢铁行业以重量为核心计量单位，材质+产地是物料的基本属性维度，
+> 必须贯穿 需求→库存→MRP计划→排产 全链路。
+>
+> 增量表（品类BOM、套裁方案、模具、替代料、二次加工等）仍在各专项文档中定义。
 
 ---
 
@@ -326,18 +329,42 @@ CREATE INDEX IX_demand_status ON dem_demand_head(demand_status);
 CREATE INDEX IX_demand_date ON dem_demand_head(required_date);
 ```
 
-### 3.2 需求单明细 (dem_demand_line)
+### 3.2 需求单明细 (dem_demand_line) — V3.0 最终版
+
+> **V3.0 修正：** 增加材质、产地、重量字段。钢铁行业客户下单时必然指定材质，
+> 可能指定产地，数量以重量(吨)为主、件数/米数为辅。
 
 ```sql
 CREATE TABLE dem_demand_line (
     demand_line_id      BIGINT IDENTITY(1,1) PRIMARY KEY,
     demand_id           BIGINT        NOT NULL,
     line_no             INT           NOT NULL,
-    material_id         BIGINT        NOT NULL,      -- 需求物料
-    required_qty        DECIMAL(18,3) NOT NULL,      -- 需求数量
+    material_id         BIGINT        NOT NULL,      -- 需求物料(品类+规格)
+    
+    -- ═══ 材质与产地(钢铁行业核心属性) ═══
+    grade_code          VARCHAR(30)   NOT NULL,      -- 材质(必填): Q235B, Q345B, 20#...
+    origin_code         VARCHAR(30)   NULL,          -- 产地(可选): 客户可能指定也可能不限
+    grade_flexible      BIT           NOT NULL DEFAULT 0,  -- 材质是否允许替代
+    origin_flexible     BIT           NOT NULL DEFAULT 1,  -- 产地是否不限(默认不限)
+    
+    -- ═══ 数量与重量(双单位) ═══
+    required_qty        DECIMAL(18,3) NOT NULL,      -- 需求数量(主单位: T/KG/M/PCS)
+    required_weight     DECIMAL(18,3) NULL,          -- 需求重量(吨) — 钢铁核心计量
+                                                     -- 当主单位=T时, 与required_qty相同
+                                                     -- 当主单位=PCS/M时, 由理论重量换算
+    price_weight        DECIMAL(18,3) NULL,          -- 计价重量(吨) — 可能与需求重量不同
+                                                     -- 如: 按理论重量计价 vs 按过磅重量计价
+    
     required_date       DATETIME      NOT NULL,      -- 行级交期
+    
+    -- ═══ 进度跟踪(也按重量) ═══
     allocated_qty       DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已分配量
+    allocated_weight    DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已分配重量
     produced_qty        DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已完成量
+    produced_weight     DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已完成重量
+    delivered_qty       DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已发货量
+    delivered_weight    DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已发货重量
+    
     line_status         VARCHAR(10)   NOT NULL DEFAULT 'OPEN',
                                                      -- OPEN/PARTIAL/COMPLETED/CANCELLED
     spec_desc           NVARCHAR(200) NULL,          -- 特殊规格要求
@@ -350,33 +377,76 @@ CREATE TABLE dem_demand_line (
 
 CREATE INDEX IX_demand_line_head ON dem_demand_line(demand_id);
 CREATE INDEX IX_demand_line_material ON dem_demand_line(material_id);
+CREATE INDEX IX_demand_line_grade ON dem_demand_line(grade_code);
 ```
 
 ---
 
 ## 4. 库存管理表
 
-### 4.1 即时库存 (inv_stock)
+### 4.1 即时库存 (inv_stock) — V3.0 最终版
+
+> **V3.0 修正：** 库存的唯一性维度 = 物料+材质+产地+仓库+库位+批次。
+> 同一物料不同材质/产地是不同的库存记录。
+> 增加重量字段，数量和重量双轨记录。
 
 ```sql
 CREATE TABLE inv_stock (
     stock_id            BIGINT IDENTITY(1,1) PRIMARY KEY,
-    material_id         BIGINT        NOT NULL,
-    warehouse_code      VARCHAR(30)   NOT NULL,      -- 仓库编码
+    material_id         BIGINT        NOT NULL,      -- 物料(品类+规格)
+    
+    -- ═══ 材质与产地(库存核心维度) ═══
+    grade_code          VARCHAR(30)   NOT NULL,      -- 材质(必填)
+    origin_code         VARCHAR(30)   NULL,          -- 产地
+    
+    -- ═══ 仓库与批次 ═══
+    warehouse_code      VARCHAR(30)   NOT NULL,
     location_code       VARCHAR(30)   NULL,          -- 库位编码
-    on_hand_qty         DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 库存数量
-    reserved_qty        DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已预留量(已被需求分配)
-    in_transit_qty      DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 在途量(采购已下单未到货)
-    in_process_qty      DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 在制量(已投产未入库)
+    batch_no            VARCHAR(60)   NULL,          -- 批次号/炉号
+    heat_no             VARCHAR(30)   NULL,          -- 炉号(钢铁特有)
+    coil_no             VARCHAR(30)   NULL,          -- 卷号(钢卷/带钢特有)
+    cert_no             VARCHAR(60)   NULL,          -- 质保书编号
+    
+    -- ═══ 数量(主单位) ═══
+    on_hand_qty         DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 库存数量(主单位)
+    reserved_qty        DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已预留量
+    in_transit_qty      DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 在途量
+    in_process_qty      DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 在制量
     quality_hold_qty    DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 质检冻结量
+    
+    -- ═══ 重量(吨) — 钢铁核心计量 ═══
+    on_hand_weight      DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 库存重量(吨)
+    reserved_weight     DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 已预留重量
+    in_transit_weight   DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 在途重量
+    in_process_weight   DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 在制重量
+    quality_hold_weight DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 冻结重量
+    
+    -- ═══ 实际规格(可能与物料标准规格有偏差) ═══
+    actual_thickness    DECIMAL(10,3) NULL,         -- 实际厚度(钢卷实测)
+    actual_width        DECIMAL(10,3) NULL,         -- 实际宽度
+    actual_length       DECIMAL(10,3) NULL,         -- 实际长度
+    actual_weight       DECIMAL(18,3) NULL,         -- 实际过磅重量
+    coil_outer_dia      DECIMAL(10,3) NULL,         -- 钢卷外径
+    coil_inner_dia      DECIMAL(10,3) NULL,         -- 钢卷内径
+    
+    -- ═══ 成本信息 ═══
+    unit_price          DECIMAL(18,2) NULL,         -- 单价(元/吨)
+    purchase_date       DATETIME      NULL,         -- 采购日期
+    
     last_updated        DATETIME      NOT NULL DEFAULT GETDATE(),
     CONSTRAINT FK_stock_material FOREIGN KEY (material_id)
-        REFERENCES bas_material(material_id),
-    CONSTRAINT UK_stock_material_wh UNIQUE (material_id, warehouse_code, ISNULL(location_code,''))
+        REFERENCES bas_material(material_id)
 );
 
 -- 可用量 = on_hand_qty - reserved_qty - quality_hold_qty
--- 供给量 = on_hand_qty - reserved_qty - quality_hold_qty + in_transit_qty + in_process_qty
+-- 可用重量 = on_hand_weight - reserved_weight - quality_hold_weight
+
+CREATE INDEX IX_stock_material ON inv_stock(material_id);
+CREATE INDEX IX_stock_grade ON inv_stock(grade_code);
+CREATE INDEX IX_stock_origin ON inv_stock(origin_code);
+CREATE INDEX IX_stock_mat_grade ON inv_stock(material_id, grade_code);
+CREATE INDEX IX_stock_coil ON inv_stock(coil_no);
+CREATE INDEX IX_stock_warehouse ON inv_stock(warehouse_code);
 ```
 
 ### 4.2 安全库存预警配置 (inv_safety_stock)
@@ -426,16 +496,32 @@ CREATE TABLE mrp_run_log (
 );
 ```
 
-### 5.2 MRP 计划订单 (mrp_plan_order)
+### 5.2 MRP 计划订单 (mrp_plan_order) — V3.0 最终版
+
+> **V3.0 修正：** MRP 计划订单必须携带材质和产地，否则无法与库存匹配、
+> 无法正确排产。增加重量字段（成材率按重量计算）。
+> 合并 08 文档中的品类BOM展开相关字段。
 
 ```sql
 CREATE TABLE mrp_plan_order (
     plan_order_id       BIGINT IDENTITY(1,1) PRIMARY KEY,
     run_id              BIGINT        NOT NULL,      -- 关联运行批次
     plan_order_no       VARCHAR(30)   NOT NULL,
-    material_id         BIGINT        NOT NULL,
+    material_id         BIGINT        NOT NULL,      -- 计划物料(品类+规格)
+    
+    -- ═══ 材质与产地(钢铁行业必填) ═══
+    grade_code          VARCHAR(30)   NOT NULL,      -- 材质: Q235B, Q345B...
+                                                     -- 来源: 继承自需求行的 grade_code
+    origin_code         VARCHAR(30)   NULL,          -- 产地: 继承自需求行(可为空=不限)
+    grade_flexible      BIT           NOT NULL DEFAULT 0,  -- 材质是否允许替代
+    origin_flexible     BIT           NOT NULL DEFAULT 1,  -- 产地是否不限
+    
     order_type          VARCHAR(10)   NOT NULL,      -- MFG=制造 PUR=采购 SUB=委外
-    planned_qty         DECIMAL(18,3) NOT NULL,      -- 计划数量
+    
+    -- ═══ 数量与重量(双单位) ═══
+    planned_qty         DECIMAL(18,3) NOT NULL,      -- 计划数量(主单位)
+    planned_weight      DECIMAL(18,3) NULL,          -- 计划重量(吨) — 钢铁核心
+    
     planned_start_date  DATETIME      NOT NULL,      -- 计划开始日期
     planned_end_date    DATETIME      NOT NULL,      -- 计划完成日期
     demand_source       VARCHAR(10)   NULL,          -- 需求来源: MTO/MTS/SSK
@@ -446,6 +532,27 @@ CREATE TABLE mrp_plan_order (
     order_status        VARCHAR(10)   NOT NULL DEFAULT 'PLANNED',
                                                      -- PLANNED/CONFIRMED/RELEASED/CANCELLED
     is_firmed           BIT           NOT NULL DEFAULT 0,  -- 是否已确认(人工锁定)
+    
+    -- ═══ 品类BOM展开时使用(来自08文档) ═══
+    is_category_bom     BIT           NOT NULL DEFAULT 0,  -- 是否品类BOM展开
+    raw_category_code   VARCHAR(20)   NULL,         -- 原料品类
+    raw_width_min       DECIMAL(10,3) NULL,         -- 原料宽度下限
+    raw_width_max       DECIMAL(10,3) NULL,         -- 原料宽度上限
+    raw_thickness_min   DECIMAL(10,3) NULL,         -- 原料厚度下限
+    raw_thickness_max   DECIMAL(10,3) NULL,         -- 原料厚度上限
+    raw_grade_code      VARCHAR(30)   NULL,         -- 原料要求材质
+    raw_origin_code     VARCHAR(30)   NULL,         -- 原料要求产地
+    raw_grade_flexible  BIT           NOT NULL DEFAULT 0,
+    raw_origin_flexible BIT           NOT NULL DEFAULT 1,
+    
+    -- 原料匹配结果(阶段1排产后填入)
+    matched_material_id BIGINT        NULL,         -- 匹配到的实际原料物料
+    matched_stock_id    BIGINT        NULL,         -- 匹配到的库存批次
+    matched_coil_no     VARCHAR(30)   NULL,         -- 匹配到的卷号
+    matched_grade_code  VARCHAR(30)   NULL,         -- 匹配到的实际材质
+    matched_origin_code VARCHAR(30)   NULL,         -- 匹配到的实际产地
+    match_status        VARCHAR(10)   NULL,         -- UNMATCHED/MATCHED/PARTIAL
+    
     remark              NVARCHAR(500) NULL,
     created_time        DATETIME      NOT NULL DEFAULT GETDATE(),
     CONSTRAINT FK_plan_order_run FOREIGN KEY (run_id)
@@ -456,6 +563,7 @@ CREATE TABLE mrp_plan_order (
 );
 
 CREATE INDEX IX_plan_order_material ON mrp_plan_order(material_id);
+CREATE INDEX IX_plan_order_grade ON mrp_plan_order(grade_code);
 CREATE INDEX IX_plan_order_status ON mrp_plan_order(order_status);
 CREATE INDEX IX_plan_order_date ON mrp_plan_order(planned_start_date);
 ```
@@ -484,28 +592,92 @@ CREATE INDEX IX_pegging_supply ON mrp_pegging(supply_id);
 
 ## 6. 排产调度表
 
-### 6.1 排产主计划 (aps_schedule)
+### 6.1 排产主计划 (aps_schedule) — V3.0 最终版
+
+> **V3.0 修正：** 排产单是生产执行的核心单据，必须完整表达"生产什么物料、
+> 什么材质、什么产地、多少重量、用什么原料"。合并 08/09/13 文档中的所有增量字段。
 
 ```sql
 CREATE TABLE aps_schedule (
     schedule_id         BIGINT IDENTITY(1,1) PRIMARY KEY,
     schedule_no         VARCHAR(30)   NOT NULL,      -- 排产单号
     plan_order_id       BIGINT        NULL,          -- 关联 MRP 计划订单
-    material_id         BIGINT        NOT NULL,
-    planned_qty         DECIMAL(18,3) NOT NULL,      -- 排产数量
+    material_id         BIGINT        NOT NULL,      -- 产出物料(品类+规格)
+    
+    -- ═══ 产出材质与产地 ═══
+    -- 需求要求的材质/产地(来自订单, 不可变)
+    demand_grade_code   VARCHAR(30)   NOT NULL,      -- 需求材质
+    demand_origin_code  VARCHAR(30)   NULL,          -- 需求产地(客户指定, 可为空)
+    -- 实际使用原料的材质/产地(可能因替代而与需求不同)
+    actual_grade_code   VARCHAR(30)   NULL,          -- 实际原料材质
+    actual_origin_code  VARCHAR(30)   NULL,          -- 实际原料产地
+    -- 产出成品标记的材质/产地(按继承规则自动计算)
+    output_grade_code   VARCHAR(30)   NULL,          -- 产出标记材质
+    output_origin_code  VARCHAR(30)   NULL,          -- 产出标记产地
+    -- 替代标记
+    grade_substituted   BIT           NOT NULL DEFAULT 0,
+    origin_substituted  BIT           NOT NULL DEFAULT 0,
+    
+    -- ═══ 数量与重量(双单位, 重量为核心) ═══
+    planned_qty         DECIMAL(18,3) NOT NULL,      -- 排产数量(主单位: T/PCS/M)
+    planned_weight      DECIMAL(18,3) NOT NULL,      -- 排产重量(吨) — 核心计量
     good_qty            DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 合格产出量
+    good_weight         DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 合格产出重量(吨)
     scrap_qty           DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 报废量
+    scrap_weight        DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 报废重量(吨)
+    -- 投入原料重量(用于计算成材率)
+    input_weight        DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 投入原料重量(吨)
+    -- 成材率 = good_weight / input_weight
+    yield_rate          DECIMAL(8,4)  NULL,          -- 成材率(完工后计算)
+    
+    -- ═══ 时间 ═══
     schedule_start      DATETIME      NOT NULL,      -- 排产开始时间
     schedule_end        DATETIME      NOT NULL,      -- 排产结束时间
     priority            INT           NOT NULL DEFAULT 50,
+    
+    -- ═══ 需求溯源 ═══
     demand_source       VARCHAR(10)   NULL,          -- MTO/MTS/SSK
-    source_demand_no    VARCHAR(60)   NULL,          -- 溯源订单号(方便查看)
-    customer_name       NVARCHAR(100) NULL,          -- 客户名(冗余，方便展示)
+    source_demand_no    VARCHAR(60)   NULL,          -- 溯源订单号
+    customer_code       VARCHAR(30)   NULL,          -- 客户编码
+    customer_name       NVARCHAR(100) NULL,          -- 客户名称
+    
+    -- ═══ 原料信息(阶段1排产绑定) ═══
+    raw_material_id     BIGINT        NULL,          -- 原料物料ID
+    raw_stock_id        BIGINT        NULL,          -- 原料库存批次ID
+    raw_grade_code      VARCHAR(30)   NULL,          -- 原料材质
+    raw_origin_code     VARCHAR(30)   NULL,          -- 原料产地
+    raw_coil_no         VARCHAR(30)   NULL,          -- 原料钢卷号
+    
+    -- ═══ 模具信息(09文档) ═══
+    mold_id             BIGINT        NULL,          -- 使用的模具
+    mold_accumulated_before DECIMAL(18,3) NULL,      -- 排产前模具累计
+    mold_accumulated_after  DECIMAL(18,3) NULL,      -- 排产后模具预计累计
+    mold_change_required BIT          NOT NULL DEFAULT 0,
+    mold_change_schedule_id BIGINT    NULL,          -- 换模后续产单ID
+    
+    -- ═══ 产出流向(09文档) ═══
+    output_flow_type    VARCHAR(20)   NOT NULL DEFAULT 'FG_STOCK',
+    output_flow_desc    NVARCHAR(100) NULL,
+    next_oper_name      NVARCHAR(100) NULL,          -- 下一工序名称
+    next_schedule_id    BIGINT        NULL,          -- 下一排产单ID
+    next_wc_id          BIGINT        NULL,          -- 下一工序工作中心
+    target_warehouse    VARCHAR(30)   NULL,          -- 目标仓库
+    direct_customer     NVARCHAR(100) NULL,          -- 直发客户
+    
+    -- ═══ 多阶段排产(08文档) ═══
+    schedule_phase      VARCHAR(10)   NOT NULL DEFAULT 'MFG',
+    schedule_level      VARCHAR(10)   NOT NULL DEFAULT 'PRODUCT',
+    parent_schedule_id  BIGINT        NULL,
+    is_multi_output     BIT           NOT NULL DEFAULT 0,
+    nesting_plan_id     BIGINT        NULL,          -- 套裁方案ID
+    
+    -- ═══ 状态与控制 ═══
     schedule_status     VARCHAR(10)   NOT NULL DEFAULT 'DRAFT',
-                                                     -- DRAFT/CONFIRMED/RELEASED/IN_PROGRESS/COMPLETED/CANCELLED
-    is_locked           BIT           NOT NULL DEFAULT 0,  -- 锁定(不参与重排)
+                                                     -- DRAFT/CONFIRMED/RELEASED/IN_PROGRESS
+                                                     -- /WAITING_MATERIAL/COMPLETED/CANCELLED
+    is_locked           BIT           NOT NULL DEFAULT 0,
     lock_reason         NVARCHAR(200) NULL,
-    schedule_version    INT           NOT NULL DEFAULT 1,  -- 版本号(每次调整+1)
+    schedule_version    INT           NOT NULL DEFAULT 1,
     remark              NVARCHAR(500) NULL,
     created_by          VARCHAR(50)   NULL,
     created_time        DATETIME      NOT NULL DEFAULT GETDATE(),
@@ -516,7 +688,9 @@ CREATE TABLE aps_schedule (
 
 CREATE INDEX IX_schedule_date ON aps_schedule(schedule_start, schedule_end);
 CREATE INDEX IX_schedule_material ON aps_schedule(material_id);
+CREATE INDEX IX_schedule_grade ON aps_schedule(demand_grade_code);
 CREATE INDEX IX_schedule_status ON aps_schedule(schedule_status);
+CREATE INDEX IX_schedule_customer ON aps_schedule(customer_code);
 ```
 
 ### 6.2 排产工序计划 (aps_schedule_oper)
@@ -649,7 +823,7 @@ CREATE TABLE bas_setup_matrix (
 
 ## 9. 关键视图
 
-### 9.1 物料可用量视图
+### 9.1 物料可用量视图 — V3.0 (含材质/产地/重量)
 
 ```sql
 CREATE VIEW v_material_available AS
@@ -657,8 +831,14 @@ SELECT
     s.material_id,
     m.material_code,
     m.material_name,
-    m.material_spec,
+    m.spec_desc,
+    m.category_code,
+    s.grade_code,              -- 材质(维度)
+    s.origin_code,             -- 产地(维度)
     s.warehouse_code,
+    s.batch_no,
+    s.coil_no,
+    -- 数量
     s.on_hand_qty,
     s.reserved_qty,
     s.in_transit_qty,
@@ -667,14 +847,85 @@ SELECT
     (s.on_hand_qty - s.reserved_qty - s.quality_hold_qty) AS available_qty,
     (s.on_hand_qty - s.reserved_qty - s.quality_hold_qty 
      + s.in_transit_qty + s.in_process_qty) AS projected_available_qty,
+    -- 重量(吨)
+    s.on_hand_weight,
+    s.reserved_weight,
+    s.in_transit_weight,
+    s.in_process_weight,
+    s.quality_hold_weight,
+    (s.on_hand_weight - s.reserved_weight - s.quality_hold_weight) AS available_weight,
+    (s.on_hand_weight - s.reserved_weight - s.quality_hold_weight 
+     + s.in_transit_weight + s.in_process_weight) AS projected_available_weight,
+    -- 安全库存
     ss.safety_qty,
-    CASE WHEN (s.on_hand_qty - s.reserved_qty - s.quality_hold_qty) 
+    CASE WHEN (s.on_hand_weight - s.reserved_weight - s.quality_hold_weight) 
               < ISNULL(ss.safety_qty, 0) 
          THEN 1 ELSE 0 END AS below_safety_flag
 FROM inv_stock s
 INNER JOIN bas_material m ON s.material_id = m.material_id
 LEFT JOIN inv_safety_stock ss ON s.material_id = ss.material_id 
     AND s.warehouse_code = ss.warehouse_code;
+```
+
+---
+
+## 10. 材质/产地/重量 全链路数据流说明 (V3.0 新增)
+
+> 钢铁行业的三大核心属性 — 材质(grade)、产地(origin)、重量(weight)
+> 必须贯穿 需求→库存→MRP→排产→报工→入库 的完整链路。
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│          材质/产地/重量 在全链路中的流转                                     │
+│                                                                           │
+│  ┌─ 需求 (dem_demand_line) ─────────────────────────────────────────────┐│
+│  │  客户下单: 方管100×50×4.0 | Q235B | 鞍钢(可选) | 50吨               ││
+│  │  字段:     material_id    | grade  | origin     | weight             ││
+│  │  含义:     品类+规格       | 必填   | 客户指定   | 核心计量(非件数)   ││
+│  └──────────────────────────────────┬──────────────────────────────────┘│
+│                                     │ MRP 需求收集                       │
+│  ┌──────────────────────────────────▼──────────────────────────────────┐│
+│  │  库存匹配 (inv_stock)                                               ││
+│  │  匹配条件: material_id + grade_code + origin_code(如有) + 可用重量   ││
+│  │  同物料不同材质 = 不同库存行, 可用量按重量计算                        ││
+│  │  找到: 库存 8T (Q235B 鞍钢) → 净需求 = 50-8 = 42T (按重量)          ││
+│  └──────────────────────────────────┬──────────────────────────────────┘│
+│                                     │ MRP 计划订单                       │
+│  ┌──────────────────────────────────▼──────────────────────────────────┐│
+│  │  MRP计划 (mrp_plan_order)                                           ││
+│  │  计划: 方管100×50×4.0 | Q235B | 鞍钢(继承) | 42吨                   ││
+│  │  BOM展开时: 原料需求也带材质 → 带钢290×4.0 Q235B 43.7吨(含损耗)     ││
+│  │  材质/产地从需求行继承, 重量按成材率反算                              ││
+│  └──────────────────────────────────┬──────────────────────────────────┘│
+│                                     │ 排产                               │
+│  ┌──────────────────────────────────▼──────────────────────────────────┐│
+│  │  排产 (aps_schedule)                                                ││
+│  │  需求材质/产地:   demand_grade = Q235B, demand_origin = 鞍钢         ││
+│  │  实际使用原料:    actual_grade = Q235B, actual_origin = 首钢(替代)   ││
+│  │  产出标记:        output_grade = Q235B, output_origin = 首钢        ││
+│  │  排产重量:        planned_weight = 42T                              ││
+│  │  投入原料重量:    input_weight = 43.7T                              ││
+│  │  产出重量:        good_weight = 40.3T (实际)                        ││
+│  │  成材率:          yield_rate = 40.3/43.7 = 92.2%                    ││
+│  └──────────────────────────────────┬──────────────────────────────────┘│
+│                                     │ 报工入库                           │
+│  ┌──────────────────────────────────▼──────────────────────────────────┐│
+│  │  入库 → inv_stock 新增一条:                                         ││
+│  │  material_id = 方管100×50×4.0                                       ││
+│  │  grade_code = Q235B (产出标记材质)                                   ││
+│  │  origin_code = 首钢 (产出标记产地, 真实原料来源)                      ││
+│  │  on_hand_weight = 40.3T                                             ││
+│  │  heat_no = 来源原料的炉号 (追溯)                                     ││
+│  └─────────────────────────────────────────────────────────────────────┘│
+│                                                                           │
+│  ══ 重量是钢铁行业的"第一语言" ══                                          │
+│  · MRP 净需求按重量计算, 不是按件数                                        │
+│  · 成材率 = 产出重量 / 投入重量 (不是数量比)                               │
+│  · 产能以 吨/小时 衡量, 不是 件/小时                                       │
+│  · 库存可用量以重量判断, 不是件数                                          │
+│  · 价格以 元/吨 计算                                                       │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 9.2 工作中心负荷率视图
