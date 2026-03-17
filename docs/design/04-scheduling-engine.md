@@ -4,6 +4,9 @@
 >
 > **重要：** 多阶段排产（原料层排产→制造层排产）、一分X 分剪套裁排产、
 > 原料驱动型排产等钢铁行业核心增强设计请参见 **[08-steel-industry-adaptation.md](08-steel-industry-adaptation.md)** 第 3~5 节。
+>
+> 模具管理与产能约束、替代料逻辑、同规格不同壁厚分组排产、产出物料流向标注等增强设计
+> 请参见 **[09-mold-substitute-flow.md](09-mold-substitute-flow.md)**。
 
 ---
 
