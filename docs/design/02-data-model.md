@@ -693,7 +693,10 @@ CREATE INDEX IX_schedule_status ON aps_schedule(schedule_status);
 CREATE INDEX IX_schedule_customer ON aps_schedule(customer_code);
 ```
 
-### 6.2 排产工序计划 (aps_schedule_oper)
+### 6.2 排产工序计划 (aps_schedule_oper) — V3.0 最终版
+
+> **V3.0 修正：** 增加重量、材质/产地、投入/产出物料、工序级流向字段。
+> 每道工序可能改变物料形态（如分剪工序投入钢卷产出带钢），需要记录。
 
 ```sql
 CREATE TABLE aps_schedule_oper (
@@ -702,19 +705,50 @@ CREATE TABLE aps_schedule_oper (
     oper_no             INT           NOT NULL,      -- 工序号
     oper_name           NVARCHAR(100) NOT NULL,
     wc_id               BIGINT        NOT NULL,      -- 分配的工作中心
+    
+    -- ═══ 数量 ═══
     planned_qty         DECIMAL(18,3) NOT NULL,
     completed_qty       DECIMAL(18,3) NOT NULL DEFAULT 0,
     scrap_qty           DECIMAL(18,3) NOT NULL DEFAULT 0,
-    setup_start         DATETIME      NULL,          -- 准备开始时间
-    setup_end           DATETIME      NULL,          -- 准备结束时间
-    oper_start          DATETIME      NOT NULL,      -- 加工开始时间
-    oper_end            DATETIME      NOT NULL,      -- 加工结束时间
-    actual_start        DATETIME      NULL,          -- 实际开始
-    actual_end          DATETIME      NULL,          -- 实际结束
+    
+    -- ═══ 重量(吨) — V3.0新增 ═══
+    planned_weight      DECIMAL(18,3) NULL,          -- 计划重量
+    completed_weight    DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 完成重量
+    scrap_weight        DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 报废重量
+    input_weight        DECIMAL(18,3) NOT NULL DEFAULT 0,  -- 投入原料重量
+    
+    -- ═══ 材质/产地 — V3.0新增 ═══
+    grade_code          VARCHAR(30)   NULL,
+    origin_code         VARCHAR(30)   NULL,
+    
+    -- ═══ 投入/产出物料(工序可能改变形态) — V3.0新增 ═══
+    input_material_id   BIGINT        NULL,          -- 本工序投入物料
+    output_material_id  BIGINT        NULL,          -- 本工序产出物料
+    
+    -- ═══ 时间 ═══
+    setup_start         DATETIME      NULL,
+    setup_end           DATETIME      NULL,
+    oper_start          DATETIME      NOT NULL,
+    oper_end            DATETIME      NOT NULL,
+    actual_start        DATETIME      NULL,
+    actual_end          DATETIME      NULL,
+    
     oper_status         VARCHAR(10)   NOT NULL DEFAULT 'PLANNED',
                                                      -- PLANNED/SETUP/RUNNING/COMPLETED/CANCELLED
     is_locked           BIT           NOT NULL DEFAULT 0,
-    sequence_in_wc      INT           NULL,          -- 在工作中心中的排序位置
+    sequence_in_wc      INT           NULL,
+    
+    -- ═══ 工序流向 — V3.0新增 ═══
+    output_flow_type    VARCHAR(20)   NULL,           -- NEXT_OPER/STOCK/CUSTOMER
+    output_flow_desc    NVARCHAR(100) NULL,
+    next_sched_oper_id  BIGINT        NULL,           -- 下一工序ID
+    
+    -- ═══ 模具(09文档) ═══
+    mold_id             BIGINT        NULL,
+    is_mold_change      BIT           NOT NULL DEFAULT 0,
+    mold_change_from    BIGINT        NULL,
+    mold_change_to      BIGINT        NULL,
+    
     remark              NVARCHAR(200) NULL,
     CONSTRAINT FK_sched_oper_head FOREIGN KEY (schedule_id)
         REFERENCES aps_schedule(schedule_id),
@@ -770,9 +804,52 @@ CREATE INDEX IX_wc_load ON aps_wc_load(wc_id, load_date);
 
 ---
 
-## 7. 报工与实绩表
+## 7. 生产执行表 — V3.0 最终版
 
-### 7.1 生产报工 (prd_report)
+> **V3.0 修正：** 新增上料/领料表(prd_material_issue)、库存出入库流水(inv_transaction)、
+> 生产入库单(inv_receipt)。报工表增加重量/材质/产地字段。
+> 详细设计和数据走查示例参见 **[16-execution-fullchain-walkthrough.md](16-execution-fullchain-walkthrough.md)**。
+
+### 7.1 上料/领料记录 (prd_material_issue) — V3.0 新增
+
+```sql
+CREATE TABLE prd_material_issue (
+    issue_id            BIGINT IDENTITY(1,1) PRIMARY KEY,
+    issue_no            VARCHAR(30)   NOT NULL,
+    issue_type          VARCHAR(20)   NOT NULL,     -- NORMAL/REPLENISH/SWAP/RETURN
+    schedule_id         BIGINT        NOT NULL,
+    sched_oper_id       BIGINT        NULL,
+    wc_id               BIGINT        NOT NULL,
+    material_id         BIGINT        NOT NULL,
+    grade_code          VARCHAR(30)   NOT NULL,
+    origin_code         VARCHAR(30)   NULL,
+    stock_id            BIGINT        NOT NULL,
+    coil_no             VARCHAR(30)   NULL,
+    batch_no            VARCHAR(60)   NULL,
+    issue_qty           DECIMAL(18,3) NOT NULL,
+    issue_weight        DECIMAL(18,3) NOT NULL,     -- 领料重量(吨)
+    warehouse_code      VARCHAR(30)   NOT NULL,
+    location_code       VARCHAR(30)   NULL,
+    issue_status        VARCHAR(10)   NOT NULL DEFAULT 'REQUESTED',
+                                                    -- REQUESTED/APPROVED/PICKED/ISSUED
+                                                    -- /DELIVERED/RETURNED
+    requested_by        VARCHAR(50)   NOT NULL,
+    requested_time      DATETIME      NOT NULL DEFAULT GETDATE(),
+    issued_by           VARCHAR(50)   NULL,
+    issued_time         DATETIME      NULL,
+    received_by         VARCHAR(50)   NULL,
+    received_time       DATETIME      NULL,
+    remark              NVARCHAR(200) NULL,
+    CONSTRAINT UK_issue_no UNIQUE (issue_no),
+    CONSTRAINT FK_issue_schedule FOREIGN KEY (schedule_id) 
+        REFERENCES aps_schedule(schedule_id)
+);
+
+CREATE INDEX IX_issue_schedule ON prd_material_issue(schedule_id);
+CREATE INDEX IX_issue_stock ON prd_material_issue(stock_id);
+```
+
+### 7.2 生产报工 (prd_report) — V3.0 增强
 
 ```sql
 CREATE TABLE prd_report (
@@ -781,13 +858,29 @@ CREATE TABLE prd_report (
     sched_oper_id       BIGINT        NOT NULL,
     report_time         DATETIME      NOT NULL DEFAULT GETDATE(),
     shift_code          VARCHAR(10)   NOT NULL,
-    report_qty          DECIMAL(18,3) NOT NULL,      -- 报工数量
-    good_qty            DECIMAL(18,3) NOT NULL,      -- 合格数量
+    
+    -- ═══ 数量 ═══
+    report_qty          DECIMAL(18,3) NOT NULL,
+    good_qty            DECIMAL(18,3) NOT NULL,
     scrap_qty           DECIMAL(18,3) NOT NULL DEFAULT 0,
     rework_qty          DECIMAL(18,3) NOT NULL DEFAULT 0,
-    start_time          DATETIME      NULL,          -- 实际开工时间
-    end_time            DATETIME      NULL,          -- 实际完工时间
-    operator_code       VARCHAR(30)   NULL,          -- 操作人员
+    
+    -- ═══ 重量(吨) — V3.0新增 ═══
+    report_weight       DECIMAL(18,3) NULL,         -- 报工重量
+    good_weight         DECIMAL(18,3) NULL,         -- 合格重量
+    scrap_weight        DECIMAL(18,3) NULL,         -- 废品重量
+    input_weight        DECIMAL(18,3) NULL,         -- 投入原料重量
+    
+    -- ═══ 材质/产地/追溯 — V3.0新增 ═══
+    grade_code          VARCHAR(30)   NULL,          -- 实际使用材质
+    origin_code         VARCHAR(30)   NULL,          -- 实际使用产地
+    coil_no             VARCHAR(30)   NULL,          -- 使用卷号
+    output_batch_no     VARCHAR(60)   NULL,          -- 产出批次号
+    output_coil_no      VARCHAR(30)   NULL,          -- 产出卷号
+    
+    start_time          DATETIME      NULL,
+    end_time            DATETIME      NULL,
+    operator_code       VARCHAR(30)   NULL,
     remark              NVARCHAR(200) NULL,
     CONSTRAINT FK_report_schedule FOREIGN KEY (schedule_id)
         REFERENCES aps_schedule(schedule_id),
@@ -797,6 +890,85 @@ CREATE TABLE prd_report (
 
 CREATE INDEX IX_report_schedule ON prd_report(schedule_id);
 CREATE INDEX IX_report_time ON prd_report(report_time);
+```
+
+### 7.3 库存出入库流水 (inv_transaction) — V3.0 新增
+
+```sql
+CREATE TABLE inv_transaction (
+    txn_id              BIGINT IDENTITY(1,1) PRIMARY KEY,
+    txn_no              VARCHAR(30)   NOT NULL,
+    txn_type            VARCHAR(20)   NOT NULL,     -- PURCHASE_IN/PRODUCE_IN/SLIT_IN
+                                                    -- /ISSUE_OUT/SHIP_OUT/TRANSFER
+                                                    -- /ADJUST/SCRAP_OUT/RETURN_IN
+    txn_direction       VARCHAR(3)    NOT NULL,     -- IN/OUT
+    material_id         BIGINT        NOT NULL,
+    grade_code          VARCHAR(30)   NOT NULL,
+    origin_code         VARCHAR(30)   NULL,
+    stock_id            BIGINT        NULL,
+    coil_no             VARCHAR(30)   NULL,
+    batch_no            VARCHAR(60)   NULL,
+    txn_qty             DECIMAL(18,3) NOT NULL,
+    txn_weight          DECIMAL(18,3) NOT NULL,     -- 交易重量(吨)
+    warehouse_code      VARCHAR(30)   NOT NULL,
+    location_code       VARCHAR(30)   NULL,
+    to_warehouse_code   VARCHAR(30)   NULL,
+    to_location_code    VARCHAR(30)   NULL,
+    source_doc_type     VARCHAR(20)   NULL,
+    source_doc_id       BIGINT        NULL,
+    source_doc_no       VARCHAR(30)   NULL,
+    before_qty          DECIMAL(18,3) NULL,
+    after_qty           DECIMAL(18,3) NULL,
+    before_weight       DECIMAL(18,3) NULL,
+    after_weight        DECIMAL(18,3) NULL,
+    txn_time            DATETIME      NOT NULL DEFAULT GETDATE(),
+    operated_by         VARCHAR(50)   NOT NULL,
+    remark              NVARCHAR(200) NULL,
+    CONSTRAINT UK_txn_no UNIQUE (txn_no)
+);
+
+CREATE INDEX IX_txn_material ON inv_transaction(material_id);
+CREATE INDEX IX_txn_stock ON inv_transaction(stock_id);
+CREATE INDEX IX_txn_time ON inv_transaction(txn_time);
+CREATE INDEX IX_txn_source ON inv_transaction(source_doc_type, source_doc_id);
+```
+
+### 7.4 生产入库单 (inv_receipt) — V3.0 新增
+
+```sql
+CREATE TABLE inv_receipt (
+    receipt_id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+    receipt_no          VARCHAR(30)   NOT NULL,
+    receipt_type        VARCHAR(20)   NOT NULL,     -- PRODUCE/SLIT/PURCHASE/RETURN
+    schedule_id         BIGINT        NULL,
+    sched_oper_id       BIGINT        NULL,
+    purchase_order_no   VARCHAR(30)   NULL,
+    material_id         BIGINT        NOT NULL,
+    grade_code          VARCHAR(30)   NOT NULL,
+    origin_code         VARCHAR(30)   NULL,
+    receipt_qty         DECIMAL(18,3) NOT NULL,
+    receipt_weight      DECIMAL(18,3) NOT NULL,     -- 入库重量(吨)
+    theory_weight       DECIMAL(18,3) NULL,
+    actual_weight       DECIMAL(18,3) NULL,         -- 过磅重量
+    qc_status           VARCHAR(10)   NOT NULL DEFAULT 'PENDING',
+                                                    -- PENDING/PASSED/FAILED/WAIVED
+    qc_by               VARCHAR(50)   NULL,
+    qc_time             DATETIME      NULL,
+    warehouse_code      VARCHAR(30)   NOT NULL,
+    location_code       VARCHAR(30)   NULL,
+    target_stock_id     BIGINT        NULL,
+    coil_no             VARCHAR(30)   NULL,
+    receipt_status      VARCHAR(10)   NOT NULL DEFAULT 'PENDING',
+                                                    -- PENDING/QC/RECEIVED/REJECTED
+    received_by         VARCHAR(50)   NULL,
+    received_time       DATETIME      NULL,
+    created_time        DATETIME      NOT NULL DEFAULT GETDATE(),
+    remark              NVARCHAR(200) NULL,
+    CONSTRAINT UK_receipt_no UNIQUE (receipt_no)
+);
+
+CREATE INDEX IX_receipt_schedule ON inv_receipt(schedule_id);
+CREATE INDEX IX_receipt_status ON inv_receipt(receipt_status);
 ```
 
 ---

@@ -46,6 +46,7 @@ AiAPS 是面向钢铁生产制造与加工行业的 MRP（物料需求计划）�
 | **[13-grade-origin-substitute.md](docs/design/13-grade-origin-substitute.md)** | **材质与产地替代料深度设计** |
 | **[14-slitting-data-walkthrough.md](docs/design/14-slitting-data-walkthrough.md)** | **分剪业务全链路数据走查实例** |
 | **[15-cost-simulate-smartswap.md](docs/design/15-cost-simulate-smartswap.md)** | **排产策略引擎、模拟推演与上料智能调单** |
+| **[16-execution-fullchain-walkthrough.md](docs/design/16-execution-fullchain-walkthrough.md)** | **生产执行全链路数据走查与缺失表补充** |
 
 ### V2.0 核心优化 (08 文档)
 
