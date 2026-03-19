@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.inventory.InvStockMapper">
+
+    <select id="selectAvailable" resultType="com.aiaps.domain.inventory.InvStock">
+        SELECT *
+        FROM inv_stock
+        WHERE PrdtID = #{prdtId}
+          AND (on_hand_weight - reserved_weight - quality_hold_weight) &gt; 0
+          <if test="patName != null and patName != ''">
+              AND PATName = #{patName}
+          </if>
+          <if test="paName != null and paName != ''">
+              AND PAName = #{paName}
+          </if>
+        ORDER BY EnterDate
+    </select>
+
+    <select id="selectAvailableWeight" resultType="java.math.BigDecimal">
+        SELECT ISNULL(SUM(on_hand_weight - reserved_weight - quality_hold_weight), 0)
+        FROM inv_stock
+        WHERE PrdtID = #{prdtId}
+          AND (on_hand_weight - reserved_weight - quality_hold_weight) &gt; 0
+          <if test="patName != null and patName != ''">
+              AND PATName = #{patName}
+          </if>
+          <if test="paName != null and paName != ''">
+              AND PAName = #{paName}
+          </if>
+    </select>
+
+    <select id="selectByMaterialWithAnyGradeOrigin" resultType="com.aiaps.domain.inventory.InvStock">
+        SELECT *
+        FROM inv_stock
+        WHERE PrdtID = #{prdtId}
+          AND (on_hand_weight - reserved_weight - quality_hold_weight) &gt; 0
+        ORDER BY EnterDate
+    </select>
+
+</mapper>
