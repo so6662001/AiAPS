@@ -48,6 +48,7 @@ AiAPS 是面向钢铁生产制造与加工行业的 MRP（物料需求计划）�
 | **[15-cost-simulate-smartswap.md](docs/design/15-cost-simulate-smartswap.md)** | **排产策略引擎、模拟推演与上料智能调单** |
 | **[16-execution-fullchain-walkthrough.md](docs/design/16-execution-fullchain-walkthrough.md)** | **生产执行全链路数据走查与缺失表补充** |
 | **[17-length-contract-mixcontrol.md](docs/design/17-length-contract-mixcontrol.md)** | **长度批次化、合同号贯穿与窜料控制** |
+| **[18-traceability-barcode.md](docs/design/18-traceability-barcode.md)** | **物料追溯体系与条码管理** |
 
 ### V2.0 核心优化 (08 文档)
 
