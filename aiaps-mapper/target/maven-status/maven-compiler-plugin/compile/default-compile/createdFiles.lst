@@ -1,5 +1,0 @@
-com/aiaps/mapper/inventory/InvStockMapper.class
-com/aiaps/mapper/base/BasMaterialMapper.class
-com/aiaps/mapper/mrp/MrpPlanOrderMapper.class
-com/aiaps/mapper/base/BasCategoryBomMapper.class
-com/aiaps/mapper/trace/TrcTraceLinkMapper.class

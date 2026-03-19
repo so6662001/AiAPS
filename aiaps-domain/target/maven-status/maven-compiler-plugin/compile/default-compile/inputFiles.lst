@@ -1,9 +1,0 @@
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/inventory/InvStock.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/demand/DemDemandLine.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/trace/TrcTraceLink.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/base/BasSpecFormula.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/base/BasMaterial.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/base/BasCategoryBom.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/base/BasWorkCenter.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/mrp/MrpPlanOrder.java
-/workspace/aiaps-domain/src/main/java/com/aiaps/domain/aps/ApsSchedule.java
