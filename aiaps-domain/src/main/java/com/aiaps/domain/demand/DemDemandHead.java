@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 @Data
 @TableName("dem_demand_head")
@@ -27,4 +28,7 @@ public class DemDemandHead implements Serializable {
     private Date createdTime;
     private String updatedBy;
     private Date updatedTime;
+
+    @TableField(exist = false)
+    private List<DemDemandLine> lines;
 }

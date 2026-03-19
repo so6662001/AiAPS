@@ -5,6 +5,7 @@ import lombok.Data;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 @Data
 @TableName("aps_schedule")
@@ -99,4 +100,7 @@ public class ApsSchedule implements Serializable {
     private Date createdTime;
     private String updatedBy;
     private Date updatedTime;
+
+    @TableField(exist = false)
+    private List<ApsScheduleOper> opers;
 }

@@ -5,6 +5,7 @@ import lombok.Data;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 @Data
 @TableName("bas_bom_head")
@@ -29,4 +30,7 @@ public class BasBomHead implements Serializable {
     private String remark;
     private String createdBy;
     private Date createdTime;
+
+    @TableField(exist = false)
+    private List<BasBomDetail> details;
 }
