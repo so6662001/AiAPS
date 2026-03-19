@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#2563eb</item>
+        <item name="colorPrimaryDark">#1e293b</item>
+        <item name="colorAccent">#2563eb</item>
+        <item name="android:statusBarColor">#1e293b</item>
+    </style>
+
+    <style name="AppToolbar">
+        <item name="android:background">#1e293b</item>
+        <item name="android:minHeight">?attr/actionBarSize</item>
+    </style>
+
+    <style name="PrimaryButton" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">#2563eb</item>
+        <item name="cornerRadius">8dp</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+    </style>
+
+    <style name="OutlineButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="strokeColor">#2563eb</item>
+        <item name="android:textColor">#2563eb</item>
+        <item name="cornerRadius">8dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+    </style>
+
+    <style name="CardStyle" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">12dp</item>
+        <item name="cardElevation">2dp</item>
+        <item name="cardBackgroundColor">#FFFFFF</item>
+    </style>
+
+    <style name="SectionTitle">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">#1e293b</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
+    <style name="FieldLabel">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">#64748b</item>
+    </style>
+
+    <style name="FieldValue">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">#1e293b</item>
+    </style>
+
+</resources>
