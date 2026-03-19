@@ -1,19 +1,12 @@
-import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
-import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
-interface ApiResponse<T = unknown> {
-  code: number
-  message: string
-  data: T
-}
-
-const service = axios.create({
-  baseURL: '/api',
+const request = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000,
 })
 
-service.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+request.interceptors.request.use(
+  (config) => {
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -23,29 +16,12 @@ service.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-service.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse>) => {
-    const res = response.data
-    if (res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
-      if (res.code === 401) {
-        localStorage.removeItem('token')
-        window.location.href = '/login'
-      }
-      return Promise.reject(new Error(res.message || '请求失败'))
-    }
-    return response
-  },
+request.interceptors.response.use(
+  (response) => response.data,
   (error) => {
-    const message =
-      error.response?.data?.message || error.message || '网络异常'
-    ElMessage.error(message)
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-    }
+    console.error('API Error:', error)
     return Promise.reject(error)
   },
 )
 
-export default service
+export default request
