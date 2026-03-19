@@ -1,0 +1,5 @@
+/workspace/aiaps-mapper/src/main/java/com/aiaps/mapper/base/BasMaterialMapper.java
+/workspace/aiaps-mapper/src/main/java/com/aiaps/mapper/base/BasCategoryBomMapper.java
+/workspace/aiaps-mapper/src/main/java/com/aiaps/mapper/trace/TrcTraceLinkMapper.java
+/workspace/aiaps-mapper/src/main/java/com/aiaps/mapper/inventory/InvStockMapper.java
+/workspace/aiaps-mapper/src/main/java/com/aiaps/mapper/mrp/MrpPlanOrderMapper.java

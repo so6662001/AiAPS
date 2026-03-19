@@ -1,0 +1,9 @@
+com/aiaps/domain/base/BasSpecFormula.class
+com/aiaps/domain/base/BasMaterial.class
+com/aiaps/domain/inventory/InvStock.class
+com/aiaps/domain/demand/DemDemandLine.class
+com/aiaps/domain/aps/ApsSchedule.class
+com/aiaps/domain/base/BasWorkCenter.class
+com/aiaps/domain/base/BasCategoryBom.class
+com/aiaps/domain/mrp/MrpPlanOrder.class
+com/aiaps/domain/trace/TrcTraceLink.class
