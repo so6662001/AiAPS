@@ -9,10 +9,13 @@ import com.aiaps.service.demand.DemandService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/v1/demand")
 @RequiredArgsConstructor
@@ -49,7 +52,7 @@ public class DemandController {
     }
 
     @PostMapping
-    public R<Void> create(@RequestBody DemDemandHead head) {
+    public R<Void> create(@Valid @RequestBody DemDemandHead head) {
         demandService.createDemand(head, head.getLines());
         return R.ok();
     }

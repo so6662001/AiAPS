@@ -5,11 +5,14 @@ import com.aiaps.domain.aps.ApsNestingPlan;
 import com.aiaps.mapper.aps.ApsNestingPlanMapper;
 import com.aiaps.service.aps.NestingService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.math.BigDecimal;
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/v1/nesting")
 @RequiredArgsConstructor
@@ -19,7 +22,7 @@ public class NestingController {
     private final ApsNestingPlanMapper nestingPlanMapper;
 
     @PostMapping
-    public R<Void> create(@RequestBody ApsNestingPlan plan) {
+    public R<Void> create(@Valid @RequestBody ApsNestingPlan plan) {
         nestingService.createNestingPlan(plan, null);
         return R.ok();
     }

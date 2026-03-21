@@ -8,8 +8,12 @@ import com.aiaps.service.base.BomService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
+
+@Validated
 @RestController
 @RequestMapping("/v1/bom")
 @RequiredArgsConstructor
@@ -38,13 +42,13 @@ public class BomController {
     }
 
     @PostMapping
-    public R<Void> create(@RequestBody BasBomHead bomHead) {
+    public R<Void> create(@Valid @RequestBody BasBomHead bomHead) {
         bomHeadMapper.insert(bomHead);
         return R.ok();
     }
 
     @PutMapping("/{id}")
-    public R<Void> update(@PathVariable Long id, @RequestBody BasBomHead bomHead) {
+    public R<Void> update(@PathVariable Long id, @Valid @RequestBody BasBomHead bomHead) {
         bomHead.setBomId(id);
         bomHeadMapper.updateById(bomHead);
         return R.ok();

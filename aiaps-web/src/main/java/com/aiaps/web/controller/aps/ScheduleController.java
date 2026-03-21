@@ -10,11 +10,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.Date;
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/v1/schedule")
 @RequiredArgsConstructor
@@ -77,7 +80,7 @@ public class ScheduleController {
     }
 
     @PostMapping("/insert")
-    public R<Void> insertOrder(@RequestBody ApsSchedule schedule) {
+    public R<Void> insertOrder(@Valid @RequestBody ApsSchedule schedule) {
         scheduleEngineService.insertOrder(schedule);
         return R.ok();
     }

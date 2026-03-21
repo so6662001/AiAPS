@@ -9,11 +9,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.Date;
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/v1/report")
 @RequiredArgsConstructor
@@ -23,7 +26,7 @@ public class ReportController {
     private final PrdReportMapper reportMapper;
 
     @PostMapping
-    public R<Void> submit(@RequestBody PrdReport report) {
+    public R<Void> submit(@Valid @RequestBody PrdReport report) {
         reportService.submitReport(report);
         return R.ok();
     }

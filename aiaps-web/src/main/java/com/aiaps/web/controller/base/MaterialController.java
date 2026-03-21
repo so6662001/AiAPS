@@ -5,8 +5,12 @@ import com.aiaps.common.result.PageResult;
 import com.aiaps.domain.base.BasMaterial;
 import com.aiaps.service.base.MaterialService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
+
+@Validated
 @RestController
 @RequestMapping("/v1/material")
 @RequiredArgsConstructor
@@ -29,13 +33,13 @@ public class MaterialController {
     }
 
     @PostMapping
-    public R<Void> create(@RequestBody BasMaterial material) {
+    public R<Void> create(@Valid @RequestBody BasMaterial material) {
         materialService.create(material);
         return R.ok();
     }
 
     @PutMapping("/{id}")
-    public R<Void> update(@PathVariable Long id, @RequestBody BasMaterial material) {
+    public R<Void> update(@PathVariable Long id, @Valid @RequestBody BasMaterial material) {
         material.setPrdtId(id);
         materialService.update(material);
         return R.ok();

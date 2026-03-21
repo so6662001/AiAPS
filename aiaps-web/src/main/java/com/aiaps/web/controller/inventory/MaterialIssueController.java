@@ -8,8 +8,12 @@ import com.aiaps.service.inventory.MaterialIssueService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
+
+@Validated
 @RestController
 @RequestMapping("/v1/material-issue")
 @RequiredArgsConstructor
@@ -19,7 +23,7 @@ public class MaterialIssueController {
     private final PrdMaterialIssueMapper materialIssueMapper;
 
     @PostMapping
-    public R<Void> create(@RequestBody PrdMaterialIssue issue) {
+    public R<Void> create(@Valid @RequestBody PrdMaterialIssue issue) {
         materialIssueService.createIssue(issue);
         return R.ok();
     }
