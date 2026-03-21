@@ -138,7 +138,7 @@ public class MrpEngineService {
             runLogMapper.updateById(runLog);
 
             log.info("MRP运算完成, runId={}, 需求数={}, 计划订单数={}",
-                    runLog.getRunId(), demands.size(), planOrderCount);
+                    runLog.getRunId(), demands.size(), context.getPlannedOrders().size());
 
         } catch (Exception e) {
             log.error("MRP运算异常, runId={}", runLog.getRunId(), e);
