@@ -43,13 +43,12 @@ public class BomService {
         return specFormulaMapper.selectByCode(formulaCode);
     }
 
-    public BasBomHead getBomTree(Long prdtId) {
-        BasBomHead head = getDefaultBom(prdtId);
+    public BasBomHead getBomTree(Long bomId) {
+        BasBomHead head = bomHeadMapper.selectById(bomId);
         if (head == null) {
-            throw new BizException("物料默认BOM不存在: prdtId=" + prdtId);
+            throw new BizException("BOM不存在: " + bomId);
         }
-        List<BasBomDetail> details = bomDetailMapper.selectByBomId(head.getBomId());
-        head.setDetails(details);
+        head.setDetails(getBomDetails(head.getBomId()));
         return head;
     }
 }

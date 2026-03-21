@@ -101,6 +101,10 @@ public class StockService {
             throw new BizException("库存数量不足, 当前: " + beforeQty + ", 需要: " + outQty);
         }
 
+        if (beforeWeight.compareTo(outWeight) < 0) {
+            throw new BizException("库存重量不足: 当前=" + beforeWeight + "T, 请求=" + outWeight + "T");
+        }
+
         stock.setOnHandQty(beforeQty.subtract(outQty));
         stock.setOnHandWeight(beforeWeight.subtract(outWeight));
         stock.setLastUpdated(new Date());

@@ -1,5 +1,6 @@
 package com.aiaps.service.mrp;
 
+import com.aiaps.common.exception.BizException;
 import com.aiaps.domain.base.BasCategoryBom;
 import com.aiaps.domain.base.BasMaterial;
 import com.aiaps.domain.base.BasSpecFormula;
@@ -112,7 +113,7 @@ public class SpecCalculationEngine {
             return BigDecimal.valueOf(result).setScale(3, RoundingMode.HALF_UP);
         } catch (Exception e) {
             log.error("公式计算失败: formula={}, params={}", formulaStr, params, e);
-            throw new RuntimeException("规格推算公式计算失败: " + formulaStr, e);
+            throw new BizException("规格推算公式计算失败: " + formulaStr);
         }
     }
 }

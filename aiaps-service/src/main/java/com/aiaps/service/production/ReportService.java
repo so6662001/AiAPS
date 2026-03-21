@@ -45,7 +45,7 @@ public class ReportService {
                 schedule.setScrapWeight(scrapWeight.add(report.getScrapWeight() != null ? report.getScrapWeight() : BigDecimal.ZERO));
                 schedule.setInputWeight(inputWeight.add(report.getInputWeight() != null ? report.getInputWeight() : BigDecimal.ZERO));
 
-                if (schedule.getPlannedWeight() != null && schedule.getPlannedWeight().compareTo(BigDecimal.ZERO) > 0) {
+                if (schedule.getInputWeight() != null && schedule.getInputWeight().compareTo(BigDecimal.ZERO) > 0) {
                     schedule.setYieldRate(schedule.getGoodWeight()
                             .divide(schedule.getInputWeight(), 4, RoundingMode.HALF_UP));
                 }
