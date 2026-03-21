@@ -332,3 +332,76 @@ public class SqlServer2008Dialect {
     }
 }
 ```
+
+---
+
+## 8. 后续新增 API 接口汇总
+
+以下接口在 08~19 文档迭代中新增，补充到总 API 清单：
+
+### 8.1 追溯与条码 (18文档)
+
+```
+GET  /api/v1/trace/barcode/{itemBarcode}     扫条码追溯
+GET  /api/v1/trace/card/{cardNo}             按卡号追溯
+GET  /api/v1/trace/contract/{contractNo}     按合同追溯
+GET  /api/v1/trace/forward/{cardNo}          正向追溯
+GET  /api/v1/trace/backward/{cardNo}         反向追溯
+GET  /api/v1/trace/schedule/{scheduleId}     按排产追溯
+POST /api/v1/barcode/generate                批量生成条码
+GET  /api/v1/barcode/{itemBarcode}           扫码查询
+GET  /api/v1/stock/{stockId}/binds           捆包清单
+```
+
+### 8.2 炉台与镀锌 (19文档)
+
+```
+GET  /api/v1/furnace                          炉台列表
+POST /api/v1/furnace-charge                   创建炉次
+POST /api/v1/furnace-charge/{id}/load-layer   装入某层
+POST /api/v1/furnace-charge/{id}/start-anneal 开始退火
+GET  /api/v1/furnace-charge/gantt             罩退甘特图
+GET  /api/v1/anneal-recipe                    退火制度
+```
+
+### 8.3 模拟推演与策略 (15文档)
+
+```
+POST /api/v1/simulation                       创建模拟
+POST /api/v1/simulation/{id}/operate          模拟中操作
+GET  /api/v1/simulation/{id}/impact           模拟影响
+POST /api/v1/simulation/{id}/apply            应用模拟
+POST /api/v1/schedule/score-options           产线评分
+POST /api/v1/schedule/estimate-completion     预估完工
+POST /api/v1/mismatch/detect                  上料不符检测
+POST /api/v1/mismatch/decide                  智能换料/调单决策
+```
+
+### 8.4 材质产地替代 (13文档)
+
+```
+GET  /api/v1/grade/hierarchy                  材质等级体系
+GET  /api/v1/origin/tier                      产地分级
+GET  /api/v1/origin/exchange-group            产地互换组
+GET  /api/v1/customer/{code}/material-pref    客户偏好
+POST /api/v1/substitute/match                 组合替代匹配
+```
+
+### 8.5 补料换料 (12文档)
+
+```
+POST /api/v1/replenish                        补料申请
+GET  /api/v1/replenish/recommend/{scheduleId} 推荐补料来源
+POST /api/v1/material-swap                    换料记录
+POST /api/v1/reprocess                        二次加工单
+GET  /api/v1/reprocess/chain/{scheduleId}     加工链路
+```
+
+### 8.6 领料与入库 (16文档)
+
+```
+POST /api/v1/material-issue                   领料申请
+PUT  /api/v1/material-issue/{id}/approve      审批
+PUT  /api/v1/material-issue/{id}/execute      执行出库
+POST /api/v1/inventory/receipt                入库单
+```
