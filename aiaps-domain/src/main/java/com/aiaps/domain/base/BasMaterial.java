@@ -2,6 +2,8 @@ package com.aiaps.domain.base;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -14,21 +16,26 @@ public class BasMaterial implements Serializable {
     @TableId(value = "PrdtID", type = IdType.AUTO)
     private Long prdtId;
 
+    @NotBlank
     @TableField("PrdtNo")
     private String prdtNo;
 
+    @NotBlank
     @TableField("PrdtName")
     private String prdtName;
 
+    @NotBlank
     @TableField("category_code")
     private String categoryCode;
 
     @TableField("category_name")
     private String categoryName;
 
+    @NotBlank
     @TableField("material_type")
     private String materialType;
 
+    @NotBlank
     @TableField("unit_code")
     private String unitCode;
 
@@ -113,6 +120,7 @@ public class BasMaterial implements Serializable {
     @TableField("enable_item_barcode")
     private Boolean enableItemBarcode;
 
+    @NotNull
     @TableField("is_active")
     private Boolean isActive;
 

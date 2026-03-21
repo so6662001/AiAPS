@@ -2,6 +2,8 @@ package com.aiaps.domain.aps;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -15,12 +17,15 @@ public class ApsSchedule implements Serializable {
     @TableId(value = "schedule_id", type = IdType.AUTO)
     private Long scheduleId;
 
+    @NotBlank
     private String scheduleNo;
     private Long planOrderId;
 
+    @NotNull
     @TableField("PrdtID")
     private Long prdtId;
 
+    @NotBlank
     private String demandGradeCode;
     private String demandOriginCode;
     private String actualGradeCode;
@@ -30,7 +35,9 @@ public class ApsSchedule implements Serializable {
     private Boolean gradeSubstituted;
     private Boolean originSubstituted;
 
+    @NotNull
     private BigDecimal plannedQty;
+    @NotNull
     private BigDecimal plannedWeight;
     private BigDecimal goodQty;
     private BigDecimal goodWeight;
@@ -39,7 +46,9 @@ public class ApsSchedule implements Serializable {
     private BigDecimal inputWeight;
     private BigDecimal yieldRate;
 
+    @NotNull
     private Date scheduleStart;
+    @NotNull
     private Date scheduleEnd;
     private Integer priority;
 

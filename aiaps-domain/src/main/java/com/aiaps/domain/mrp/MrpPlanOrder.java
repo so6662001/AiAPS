@@ -2,6 +2,8 @@ package com.aiaps.domain.mrp;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -14,12 +16,16 @@ public class MrpPlanOrder implements Serializable {
     @TableId(value = "plan_order_id", type = IdType.AUTO)
     private Long planOrderId;
 
+    @NotNull
     private Long runId;
+    @NotBlank
     private String planOrderNo;
 
+    @NotNull
     @TableField("PrdtID")
     private Long prdtId;
 
+    @NotBlank
     @TableField("PATName")
     private String patName;
 
@@ -29,10 +35,14 @@ public class MrpPlanOrder implements Serializable {
     private Boolean gradeFlexible;
     private Boolean originFlexible;
 
+    @NotBlank
     private String orderType;
+    @NotNull
     private BigDecimal plannedQty;
     private BigDecimal plannedWeight;
+    @NotNull
     private Date plannedStartDate;
+    @NotNull
     private Date plannedEndDate;
 
     private String demandSource;

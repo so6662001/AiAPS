@@ -2,6 +2,8 @@ package com.aiaps.domain.production;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -14,11 +16,16 @@ public class PrdReport implements Serializable {
     @TableId(value = "report_id", type = IdType.AUTO)
     private Long reportId;
 
+    @NotNull
     private Long scheduleId;
+    @NotNull
     private Long schedOperId;
     private Date reportTime;
+    @NotBlank
     private String shiftCode;
+    @NotNull
     private BigDecimal reportQty;
+    @NotNull
     private BigDecimal goodQty;
     private BigDecimal scrapQty;
     private BigDecimal reworkQty;
