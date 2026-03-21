@@ -127,15 +127,15 @@ function handleCreate() { ElMessage.info('新增领料功能待实现') }
 function handleView(_row: IssueItem) { ElMessage.info('详情功能待实现') }
 
 async function handleApprove(row: IssueItem) {
-  try { await approveMaterialIssue(row.id); row.status = 'APPROVED'; ElMessage.success('审批通过') } catch { row.status = 'APPROVED'; ElMessage.success('审批通过（演示）') }
+  try { await approveMaterialIssue(row.id); row.status = 'APPROVED'; ElMessage.success('审批通过') } catch { ElMessage.error('审批失败') }
 }
 
 async function handleIssue(row: IssueItem) {
-  try { await issueMaterial(row.id); row.status = 'ISSUED'; ElMessage.success('发料成功') } catch { row.status = 'ISSUED'; row.actualWeight = row.requestWeight; ElMessage.success('发料成功（演示）') }
+  try { await issueMaterial(row.id); row.status = 'ISSUED'; ElMessage.success('发料成功') } catch { ElMessage.error('发料失败') }
 }
 
 async function handleDeliver(row: IssueItem) {
-  try { await deliverMaterial(row.id); row.status = 'DELIVERED'; ElMessage.success('签收完成') } catch { row.status = 'DELIVERED'; ElMessage.success('签收完成（演示）') }
+  try { await deliverMaterial(row.id); row.status = 'DELIVERED'; ElMessage.success('签收完成') } catch { ElMessage.error('签收失败') }
 }
 
 async function fetchData() {

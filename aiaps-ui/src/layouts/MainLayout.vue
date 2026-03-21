@@ -85,7 +85,17 @@
           <el-badge :value="3" :max="9" class="notify-badge">
             <el-icon :size="18"><Bell /></el-icon>
           </el-badge>
-          <el-avatar :size="32" class="user-avatar">U</el-avatar>
+          <el-dropdown trigger="click">
+            <div class="user-info">
+              <el-avatar :size="28" style="background: #2563eb;">{{ username.charAt(0).toUpperCase() }}</el-avatar>
+              <span class="username">{{ username }}</span>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </el-header>
       <el-main class="layout-content">
@@ -96,8 +106,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   Monitor, Setting, Document, Cpu, Calendar, Box,
@@ -105,7 +115,15 @@ import {
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const appStore = useAppStore()
+
+const username = ref(localStorage.getItem('username') || '管理员')
+const handleLogout = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('username')
+  router.push('/login')
+}
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const currentRoute = computed(() => route.path)

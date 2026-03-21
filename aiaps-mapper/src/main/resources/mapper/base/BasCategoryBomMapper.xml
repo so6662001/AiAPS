@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.base.BasCategoryBomMapper">
+    <select id="selectByParentCategory" resultType="com.aiaps.domain.base.BasCategoryBom">
+        SELECT * FROM bas_category_bom WHERE parent_category = #{parentCategory} AND is_active = 1
+    </select>
+    <select id="selectByChildCategory" resultType="com.aiaps.domain.base.BasCategoryBom">
+        SELECT * FROM bas_category_bom WHERE child_category = #{childCategory} AND is_active = 1
+    </select>
+    <select id="selectAllActive" resultType="com.aiaps.domain.base.BasCategoryBom">
+        SELECT * FROM bas_category_bom WHERE is_active = 1
+    </select>
+</mapper>

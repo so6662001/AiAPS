@@ -3,6 +3,12 @@ import MainLayout from '@/layouts/MainLayout.vue'
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/login/LoginView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/dashboard',
@@ -99,11 +105,25 @@ const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/error/NotFoundView.vue'),
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('token')
+  if (to.meta.requiresAuth !== false && !token) {
+    next('/login')
+  } else {
+    next()
+  }
 })
 
 export default router

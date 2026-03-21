@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.trace.TrcTraceLinkMapper">
+    <select id="selectBySourceCardNo" resultType="com.aiaps.domain.trace.TrcTraceLink">
+        SELECT * FROM trc_trace_link WHERE source_CardNo = #{cardNo} ORDER BY trace_time
+    </select>
+    <select id="selectByTargetCardNo" resultType="com.aiaps.domain.trace.TrcTraceLink">
+        SELECT * FROM trc_trace_link WHERE target_CardNo = #{cardNo} ORDER BY trace_time
+    </select>
+    <select id="selectByContract" resultType="com.aiaps.domain.trace.TrcTraceLink">
+        SELECT * FROM trc_trace_link WHERE contract_no = #{contractNo} ORDER BY trace_time
+    </select>
+    <select id="selectBySchedule" resultType="com.aiaps.domain.trace.TrcTraceLink">
+        SELECT * FROM trc_trace_link WHERE schedule_id = #{scheduleId} ORDER BY trace_time
+    </select>
+</mapper>

@@ -163,7 +163,9 @@ onMounted(async () => {
       getProductionLineStatus(),
       getUrgentItems(),
     ])
-    if (statsRes) Object.assign(statCards.value, statsRes)
+    if (Array.isArray(statsRes)) {
+      statCards.value = statsRes
+    }
     if (linesRes) productionLines.value = linesRes as typeof productionLines.value
     if (urgentRes) urgentItems.value = urgentRes as typeof urgentItems.value
   } catch {

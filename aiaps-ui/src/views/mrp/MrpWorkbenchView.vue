@@ -234,10 +234,9 @@ async function handleRunMrp() {
     lastRunTime.value = new Date().toLocaleString('zh-CN')
     ElMessage.success('MRP运行完成')
     fetchPlanOrders()
-  } catch {
+  } catch (err) {
     runProgress.value = 100
-    ElMessage.success('MRP模拟运行完成（演示）')
-    lastRunTime.value = new Date().toLocaleString('zh-CN')
+    ElMessage.error('MRP运行失败: ' + (err as Error).message)
   } finally {
     clearInterval(timer)
     setTimeout(() => { isRunning.value = false }, 800)
@@ -251,8 +250,7 @@ async function handleBatchConfirm() {
     ElMessage.success(`已确认 ${ids.length} 条计划订单`)
     fetchPlanOrders()
   } catch {
-    selectedOrders.value.forEach((o) => { o.status = 'CONFIRMED' })
-    ElMessage.success(`已确认 ${ids.length} 条计划订单（演示）`)
+    ElMessage.error('确认失败')
   }
 }
 

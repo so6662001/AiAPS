@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: '/api',
   timeout: 30000,
 })
 
@@ -13,15 +14,43 @@ request.interceptors.request.use(
     }
     return config
   },
-  (error) => Promise.reject(error),
+  (error) => Promise.reject(error)
 )
 
 request.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    console.error('API Error:', error)
-    return Promise.reject(error)
+  (response) => {
+    const res = response.data
+    if (res.code !== undefined && res.code !== 200) {
+      ElMessage.error(res.message || '请求失败')
+      if (res.code === 401) {
+        localStorage.removeItem('token')
+        window.location.href = '/login'
+      }
+      return Promise.reject(new Error(res.message || '请求失败'))
+    }
+    return res
   },
+  (error) => {
+    if (error.response) {
+      const status = error.response.status
+      if (status === 401) {
+        ElMessage.error('登录已过期，请重新登录')
+        localStorage.removeItem('token')
+        window.location.href = '/login'
+      } else if (status === 403) {
+        ElMessage.error('没有权限访问')
+      } else if (status === 404) {
+        ElMessage.error('请求的资源不存在')
+      } else {
+        ElMessage.error(error.response.data?.message || '服务器错误')
+      }
+    } else if (error.message.includes('timeout')) {
+      ElMessage.error('请求超时，请稍后重试')
+    } else {
+      ElMessage.error('网络连接异常')
+    }
+    return Promise.reject(error)
+  }
 )
 
 export default request
