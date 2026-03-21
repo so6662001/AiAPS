@@ -95,7 +95,7 @@ public class MrpContext {
 
     public List<BasCategoryBom> getCategoryBoms(String parentCategory) {
         return categoryBoms.stream()
-                .filter(cb -> parentCategory.equals(cb.getParentCategory()))
+                .filter(cb -> parentCategory != null && parentCategory.equals(cb.getParentCategory()))
                 .collect(Collectors.toList());
     }
 }

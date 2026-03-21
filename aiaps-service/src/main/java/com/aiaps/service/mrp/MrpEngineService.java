@@ -1,5 +1,6 @@
 package com.aiaps.service.mrp;
 
+import com.aiaps.common.exception.BizException;
 import com.aiaps.domain.base.BasBomDetail;
 import com.aiaps.domain.base.BasBomHead;
 import com.aiaps.domain.base.BasCategoryBom;
@@ -50,7 +51,6 @@ public class MrpEngineService {
     private final SpecCalculationEngine specCalculationEngine;
 
     @Async
-    @Transactional
     public void runMrp(String runType, Integer horizonDays, String runBy) {
         MrpRunLog runLog = new MrpRunLog();
         runLog.setRunNo("MRP" + System.currentTimeMillis());
@@ -130,15 +130,9 @@ public class MrpEngineService {
                 }
             }
 
-            int planOrderCount = 0;
-            for (MrpContext.PlannedOrderDto dto : context.getPlannedOrders()) {
-                MrpPlanOrder po = convertToEntity(dto);
-                planOrderMapper.insert(po);
-                dto.setPlanOrderId(po.getPlanOrderId());
-                planOrderCount++;
-            }
+            saveMrpResults(runLog.getRunId(), context.getPlannedOrders());
 
-            runLog.setPlanOrderCount(planOrderCount);
+            runLog.setPlanOrderCount(context.getPlannedOrders().size());
             runLog.setRunStatus("COMPLETED");
             runLog.setEndTime(new Date());
             runLogMapper.updateById(runLog);
@@ -168,6 +162,60 @@ public class MrpEngineService {
             runLog.setRunStatus("CANCELLED");
             runLog.setEndTime(new Date());
             runLogMapper.updateById(runLog);
+        }
+    }
+
+    @Transactional
+    public void confirmPlanOrders(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BizException("请选择要确认的计划订单");
+        }
+        for (Long id : ids) {
+            MrpPlanOrder order = planOrderMapper.selectById(id);
+            if (order == null) continue;
+            if (!"PLANNED".equals(order.getOrderStatus())) {
+                throw new BizException("计划订单 " + order.getPlanOrderNo() + " 状态不是PLANNED，无法确认");
+            }
+            order.setOrderStatus("CONFIRMED");
+            planOrderMapper.updateById(order);
+        }
+    }
+
+    @Transactional
+    public void cancelPlanOrders(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BizException("请选择要取消的计划订单");
+        }
+        for (Long id : ids) {
+            MrpPlanOrder order = planOrderMapper.selectById(id);
+            if (order == null) continue;
+            order.setOrderStatus("CANCELLED");
+            planOrderMapper.updateById(order);
+        }
+    }
+
+    @Transactional
+    public void saveMrpResults(Long runId, List<MrpContext.PlannedOrderDto> plannedOrders) {
+        for (MrpContext.PlannedOrderDto dto : plannedOrders) {
+            MrpPlanOrder order = new MrpPlanOrder();
+            order.setRunId(runId);
+            order.setPlanOrderNo(dto.getPlanOrderNo());
+            order.setPrdtId(dto.getPrdtId());
+            order.setPatName(dto.getPatName());
+            order.setPaName(dto.getPaName());
+            order.setOrderType(dto.getOrderType());
+            order.setPlannedQty(dto.getPlannedQty());
+            order.setPlannedWeight(dto.getPlannedWeight());
+            order.setPlannedStartDate(dto.getPlannedStartDate());
+            order.setPlannedEndDate(dto.getPlannedEndDate());
+            order.setDemandSource(dto.getDemandSource());
+            order.setSourceDemandId(dto.getSourceDemandId());
+            order.setSourceDemandLine(dto.getSourceDemandLine());
+            order.setContractNo(dto.getContractNo());
+            order.setOrderStatus("PLANNED");
+            order.setIsFirmed(false);
+            order.setCreatedTime(new Date());
+            planOrderMapper.insert(order);
         }
     }
 

@@ -76,4 +76,8 @@ public class InvStock implements Serializable {
     private String cardRemark2;
 
     private Date lastUpdated;
+
+    @Version
+    @TableField("version")
+    private Integer version;
 }

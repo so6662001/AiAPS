@@ -65,26 +65,13 @@ public class MrpController {
 
     @PutMapping("/plan-order/confirm")
     public R<Void> confirmPlanOrders(@RequestBody List<Long> ids) {
-        for (Long id : ids) {
-            MrpPlanOrder order = planOrderMapper.selectById(id);
-            if (order != null) {
-                order.setOrderStatus("CONFIRMED");
-                order.setIsFirmed(true);
-                planOrderMapper.updateById(order);
-            }
-        }
+        mrpEngineService.confirmPlanOrders(ids);
         return R.ok();
     }
 
     @PutMapping("/plan-order/cancel")
     public R<Void> cancelPlanOrders(@RequestBody List<Long> ids) {
-        for (Long id : ids) {
-            MrpPlanOrder order = planOrderMapper.selectById(id);
-            if (order != null) {
-                order.setOrderStatus("CANCELLED");
-                planOrderMapper.updateById(order);
-            }
-        }
+        mrpEngineService.cancelPlanOrders(ids);
         return R.ok();
     }
 }
