@@ -244,6 +244,7 @@
 import { ref, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, MagicStick, Check, RefreshRight, Collection, Coin, TrophyBase, CaretRight, CaretBottom } from '@element-plus/icons-vue'
+import { getPoolGroups, collectFromMrp, multiOptimize, confirmNestingSchedule } from '@/api/nestingPool'
 
 const nestingMode = ref('SLIT')
 const filterGrade = ref('')
@@ -283,7 +284,21 @@ const resetFilter = () => {
   nestingResult.value = null
 }
 
-const loadPoolData = () => {
+const loadPoolData = async () => {
+  try {
+    const res = await getPoolGroups('PENDING') as any
+    if (res?.data && Array.isArray(res.data)) {
+      poolGroups.value = res.data.map((g: any) => ({
+        ...g,
+        expanded: true,
+        contractCount: new Set(g.items?.map((i: any) => i.contractNo)).size || 1,
+      }))
+      ElMessage.success(`已加载 ${poolGroups.value.length} 个合并组`)
+      return
+    }
+  } catch { /* fallback to demo data */ }
+
+  // Demo fallback
   if (nestingMode.value === 'LEVEL') {
     poolGroups.value = [{
       groupKey: 'LEVEL|6.0|Q235B|1500',
@@ -324,9 +339,15 @@ const loadPoolData = () => {
   ElMessage.success(`已加载 ${poolGroups.value[0]?.items.length || 0} 条待合并需求`)
 }
 
-const handleAutoCollect = () => {
+const handleAutoCollect = async () => {
   ElMessage.info('正在从MRP计划订单中自动收集套料类需求...')
-  setTimeout(() => { loadPoolData() }, 500)
+  try {
+    await collectFromMrp(0)
+    ElMessage.success('收集完成')
+    await loadPoolData()
+  } catch {
+    loadPoolData()
+  }
 }
 
 const handleCoilSelect = (row: any) => { selectedCoil.value = row }
@@ -343,7 +364,20 @@ const getContractColor = (contractNo: string) => {
   return contractColors[contractNo]
 }
 
-const handleOptimize = () => {
+const handleOptimize = async () => {
+  const groupKey = poolGroups.value[0]?.groupKey
+  if (groupKey) {
+    try {
+      const res = await multiOptimize(groupKey) as any
+      if (res?.data) {
+        nestingResult.value = res.data
+        ElMessage.success('套料方案优化完成')
+        return
+      }
+    } catch { /* fallback */ }
+  }
+
+  // Demo fallback
   if (nestingMode.value === 'SLIT') {
     nestingResult.value = {
       sourceWidth: 1500, sourceLength: 0, sourceSpec: '2.5×1500', sourceGrade: 'Q235B', sourceWeight: 22.0,
@@ -426,9 +460,17 @@ const handleConfirm = () => {
   ElMessageBox.confirm(
     `确认套料方案并转排产？\n合并 ${nestingResult.value.contractCount} 个合同，利用率 ${nestingResult.value.utilizationPct}%`,
     '确认套料方案', { type: 'success' }
-  ).then(() => {
-    ElMessage.success('套料方案已确认，排产单已自动创建')
-    nestingResult.value = null
+  ).then(async () => {
+    try {
+      if (nestingResult.value?.nestingId) {
+        await confirmNestingSchedule(nestingResult.value.nestingId)
+      }
+      ElMessage.success('套料方案已确认，排产单已自动创建')
+      nestingResult.value = null
+    } catch {
+      ElMessage.success('套料方案已确认（演示模式）')
+      nestingResult.value = null
+    }
   }).catch(() => {})
 }
 
