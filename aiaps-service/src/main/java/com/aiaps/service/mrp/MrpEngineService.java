@@ -1,6 +1,7 @@
 package com.aiaps.service.mrp;
 
 import com.aiaps.common.exception.BizException;
+import com.aiaps.domain.aps.ApsNestingPool;
 import com.aiaps.domain.base.BasBomDetail;
 import com.aiaps.domain.base.BasBomHead;
 import com.aiaps.domain.base.BasCategoryBom;
@@ -10,6 +11,7 @@ import com.aiaps.domain.demand.DemDemandLine;
 import com.aiaps.domain.mrp.MrpPegging;
 import com.aiaps.domain.mrp.MrpPlanOrder;
 import com.aiaps.domain.mrp.MrpRunLog;
+import com.aiaps.mapper.aps.ApsNestingPoolMapper;
 import com.aiaps.mapper.base.BasBomDetailMapper;
 import com.aiaps.mapper.base.BasBomHeadMapper;
 import com.aiaps.mapper.base.BasCategoryBomMapper;
@@ -20,9 +22,11 @@ import com.aiaps.mapper.inventory.InvStockMapper;
 import com.aiaps.mapper.mrp.MrpPeggingMapper;
 import com.aiaps.mapper.mrp.MrpPlanOrderMapper;
 import com.aiaps.mapper.mrp.MrpRunLogMapper;
+import com.aiaps.service.aps.NestingAutoService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +53,10 @@ public class MrpEngineService {
     private final DemDemandLineMapper demandLineMapper;
     private final DualBomLlcCalculator dualBomLlcCalculator;
     private final SpecCalculationEngine specCalculationEngine;
+    private final ApsNestingPoolMapper nestingPoolMapper;
+
+    @Autowired
+    private NestingAutoService nestingAutoService;
 
     @Async
     public void runMrp(String runType, Integer horizonDays, String runBy) {
@@ -131,6 +139,24 @@ public class MrpEngineService {
             }
 
             saveMrpResults(runLog.getRunId(), context.getPlannedOrders());
+
+            // Step 3.5: 套料自动合并优化
+            try {
+                List<String> groupKeys = nestingAutoService.getPoolGroups("PENDING").stream()
+                        .map(g -> g.getGroupKey()).distinct().collect(Collectors.toList());
+                int nestingCount = 0;
+                for (String gk : groupKeys) {
+                    try {
+                        nestingAutoService.autoOptimize(gk);
+                        nestingCount++;
+                    } catch (Exception ne) {
+                        log.warn("套料优化异常, groupKey={}: {}", gk, ne.getMessage());
+                    }
+                }
+                log.info("Step 3.5: 套料优化完成, {}个组", nestingCount);
+            } catch (Exception ne) {
+                log.warn("套料自动优化阶段异常: {}", ne.getMessage());
+            }
 
             runLog.setPlanOrderCount(context.getPlannedOrders().size());
             runLog.setRunStatus("COMPLETED");
@@ -326,38 +352,80 @@ public class MrpEngineService {
         List<BasCategoryBom> catBoms = context.getCategoryBoms(material.getCategoryCode());
         if (catBoms != null && !catBoms.isEmpty()) {
             for (BasCategoryBom catBom : catBoms) {
+                String childCategoryCode = catBom.getChildCategory();
                 String formulaCode = catBom.getCalcFormulaCode();
                 BasSpecFormula formula = context.getFormulaMap().get(formulaCode);
 
-                MrpContext.PlannedOrderDto childOrder = new MrpContext.PlannedOrderDto();
-                childOrder.setRunId(runId);
-                childOrder.setPatName(parentOrder.getPatName());
-                childOrder.setPaName(parentOrder.getPaName());
-                childOrder.setOrderType("MFG");
-                childOrder.setContractNo(parentOrder.getContractNo());
-                childOrder.setDemandSource("CAT_BOM_EXPLODE");
-                childOrder.setSourceDemandId(parentOrder.getSourceDemandId());
-                childOrder.setSourceDemandLine(parentOrder.getSourceDemandLine());
-                childOrder.setOrderStatus("PLANNED");
-                childOrder.setIsFirmed(false);
-                childOrder.setIsCategoryBom(true);
-                childOrder.setRawCategoryCode(catBom.getChildCategory());
-                childOrder.setBomLevel((parentOrder.getBomLevel() != null ? parentOrder.getBomLevel() : 0) + 1);
-                childOrder.setCreatedTime(new Date());
+                BigDecimal childThickness = null;
+                BigDecimal childWidth = null;
+                BigDecimal childWeight = null;
+                BigDecimal childQty = parentOrder.getPlannedQty();
 
                 if (formula != null) {
                     BigDecimal qty = parentOrder.getPlannedWeight() != null
                             ? parentOrder.getPlannedWeight() : BigDecimal.ZERO;
                     SpecCalculationEngine.RawMaterialSpec spec =
                             specCalculationEngine.calculate(material, qty, formula, catBom);
-                    childOrder.setRawWidthMin(spec.getWidthMin());
-                    childOrder.setRawWidthMax(spec.getWidthMax());
-                    childOrder.setRawThicknessMin(spec.getThicknessMin());
-                    childOrder.setRawThicknessMax(spec.getThicknessMax());
-                    childOrder.setPlannedWeight(spec.getWeightPerUnit());
+                    childThickness = spec.getThicknessMin();
+                    childWidth = spec.getWidthMin();
+                    childWeight = spec.getWeightPerUnit();
                 }
 
-                context.addPlannedOrder(childOrder);
+                if (nestingAutoService != null && nestingAutoService.isNestingCandidate(childCategoryCode)) {
+                    ApsNestingPool pool = new ApsNestingPool();
+                    pool.setPoolNo("NP-" + System.currentTimeMillis());
+                    pool.setDemandLineId(parentOrder.getSourceDemandLine());
+                    pool.setCategoryCode(childCategoryCode);
+                    pool.setPatName(parentOrder.getPatName());
+                    pool.setPaName(parentOrder.getPaName());
+                    pool.setThickness(childThickness);
+                    pool.setWidth(childWidth);
+                    pool.setRequiredWeight(childWeight);
+                    pool.setRequiredQty(childQty);
+                    pool.setRemainingWeight(childWeight);
+                    pool.setRemainingQty(childQty);
+                    pool.setContractNo(parentOrder.getContractNo());
+                    pool.setAllowMerge(true);
+                    pool.setPoolStatus("PENDING");
+                    pool.setRunId(runId);
+                    pool.setCreatedTime(new Date());
+                    String groupKey = "CUT_PART".equals(childCategoryCode)
+                            ? "CUT|" + childThickness + "|" + parentOrder.getPatName()
+                            : ("STRIP".equals(childCategoryCode) ? "SLIT" : "LEVEL")
+                              + "|" + childThickness + "|" + parentOrder.getPatName() + "|1500";
+                    pool.setMergeGroupKey(groupKey);
+                    nestingPoolMapper.insert(pool);
+                } else {
+                    MrpContext.PlannedOrderDto childOrder = new MrpContext.PlannedOrderDto();
+                    childOrder.setRunId(runId);
+                    childOrder.setPatName(parentOrder.getPatName());
+                    childOrder.setPaName(parentOrder.getPaName());
+                    childOrder.setOrderType("MFG");
+                    childOrder.setContractNo(parentOrder.getContractNo());
+                    childOrder.setDemandSource("CAT_BOM_EXPLODE");
+                    childOrder.setSourceDemandId(parentOrder.getSourceDemandId());
+                    childOrder.setSourceDemandLine(parentOrder.getSourceDemandLine());
+                    childOrder.setOrderStatus("PLANNED");
+                    childOrder.setIsFirmed(false);
+                    childOrder.setIsCategoryBom(true);
+                    childOrder.setRawCategoryCode(childCategoryCode);
+                    childOrder.setBomLevel((parentOrder.getBomLevel() != null ? parentOrder.getBomLevel() : 0) + 1);
+                    childOrder.setCreatedTime(new Date());
+
+                    if (formula != null) {
+                        BigDecimal qty = parentOrder.getPlannedWeight() != null
+                                ? parentOrder.getPlannedWeight() : BigDecimal.ZERO;
+                        SpecCalculationEngine.RawMaterialSpec spec =
+                                specCalculationEngine.calculate(material, qty, formula, catBom);
+                        childOrder.setRawWidthMin(spec.getWidthMin());
+                        childOrder.setRawWidthMax(spec.getWidthMax());
+                        childOrder.setRawThicknessMin(spec.getThicknessMin());
+                        childOrder.setRawThicknessMax(spec.getThicknessMax());
+                        childOrder.setPlannedWeight(spec.getWeightPerUnit());
+                    }
+
+                    context.addPlannedOrder(childOrder);
+                }
             }
         }
     }

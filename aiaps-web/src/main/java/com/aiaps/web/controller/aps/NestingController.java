@@ -3,6 +3,7 @@ package com.aiaps.web.controller.aps;
 import com.aiaps.common.result.R;
 import com.aiaps.domain.aps.ApsNestingPlan;
 import com.aiaps.mapper.aps.ApsNestingPlanMapper;
+import com.aiaps.service.aps.NestingAutoService;
 import com.aiaps.service.aps.NestingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -19,6 +20,7 @@ import java.util.List;
 public class NestingController {
 
     private final NestingService nestingService;
+    private final NestingAutoService nestingAutoService;
     private final ApsNestingPlanMapper nestingPlanMapper;
 
     @PostMapping
@@ -38,5 +40,26 @@ public class NestingController {
             @RequestParam Long sourceStockId,
             @RequestParam List<BigDecimal> requiredWidths) {
         return R.ok(nestingService.optimizeSlit(sourceStockId, requiredWidths));
+    }
+
+    @PostMapping("/multi-optimize")
+    public R<NestingAutoService.NestingOptimizeResult> multiOptimize(@RequestParam String groupKey) {
+        return R.ok(nestingAutoService.autoOptimize(groupKey));
+    }
+
+    @PostMapping("/multi-optimize/preview")
+    public R<NestingAutoService.NestingOptimizeResult> multiOptimizePreview(@RequestParam String groupKey) {
+        return R.ok(nestingAutoService.autoOptimize(groupKey));
+    }
+
+    @PostMapping("/{id}/confirm-schedule")
+    public R<Void> confirmAndSchedule(@PathVariable Long id) {
+        nestingAutoService.confirmAndSchedule(id);
+        return R.ok();
+    }
+
+    @GetMapping("/{id}/cost-split")
+    public R<List<NestingAutoService.CostSplitItem>> getCostSplit(@PathVariable Long id) {
+        return R.ok(nestingAutoService.getCostSplit(id));
     }
 }
