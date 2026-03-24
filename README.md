@@ -131,6 +131,7 @@ aiaps-android/                     Android 原生 (Java)
 | 17 | [length-contract-mixcontrol](docs/design/17-length-contract-mixcontrol.md) | V1 | 长度批次化、合同号贯穿、窜料控制、页面/报表示例图 |
 | 18 | [traceability-barcode](docs/design/18-traceability-barcode.md) | V1 | 三级标识(卡号→捆包→条码)、追溯关联表、追溯查询 |
 | 19 | [coldroll-galvanize-process](docs/design/19-coldroll-galvanize-process.md) | V1 | 冷板/镀锌板工艺(罩退炉台层位+酸轧联合PLTCM+镀锌花型) |
+| 20 | [multi-demand-nesting](docs/design/20-multi-demand-nesting.md) | V1 | 多客户需求合并套料(开平/分剪/剪切跨合同合并+二维排版) |
 
 ## 设计演进历程
 
