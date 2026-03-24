@@ -74,6 +74,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '套裁方案' },
       },
       {
+        path: 'nesting/multi',
+        name: 'MultiNesting',
+        component: () => import('@/views/nesting/MultiNestingView.vue'),
+        meta: { title: '合并套料' },
+      },
+      {
         path: 'inventory/stock',
         name: 'StockList',
         component: () => import('@/views/inventory/StockListView.vue'),

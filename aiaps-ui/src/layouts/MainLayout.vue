@@ -48,6 +48,7 @@
             <el-menu-item index="/schedule">排产甘特图</el-menu-item>
             <el-menu-item index="/schedule/list">排产列表</el-menu-item>
             <el-menu-item index="/nesting">套裁方案</el-menu-item>
+            <el-menu-item index="/nesting/multi">合并套料</el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="inventory">
             <template #title>
