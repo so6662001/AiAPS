@@ -30,4 +30,10 @@ public class ApsNestingDetail implements Serializable {
     private String outputType;
     private String contractNo;
     private String remark;
+
+    // ═══ 多需求合并套料增强 (20文档) ═══
+    private String customerCode;        // 客户编码
+    private String customerName;        // 客户名称
+    private Long poolId;                // 关联套料需求池
+    private BigDecimal allocatedCost;   // 分摊成本
 }

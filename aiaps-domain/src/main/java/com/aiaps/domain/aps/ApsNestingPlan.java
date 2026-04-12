@@ -38,4 +38,13 @@ public class ApsNestingPlan implements Serializable {
     private String nestingStatus;
     private String createdBy;
     private Date createdTime;
+
+    // ═══ 多需求合并套料增强 (20文档) ═══
+    private String nestingMode;         // SINGLE/MULTI_1D/MULTI_2D
+    private String mergeGroupKey;       // 合并组键
+    private Integer contractCount;      // 涉及合同数
+    private Integer customerCount;      // 涉及客户数
+    private Integer demandCount;        // 涉及需求数
+    private BigDecimal totalCost;       // 总成本
+    private String costSplitMethod;     // WEIGHT/QTY/AREA
 }

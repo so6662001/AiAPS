@@ -27,4 +27,10 @@ public class MrpRunLog implements Serializable {
     private String errorMessage;
     private String runBy;
     private Date createdTime;
+
+    // ═══ 套料统计 (20文档) ═══
+    private Integer nestingPoolCount;       // 进入套料池的需求数
+    private Integer nestingPlanCount;       // 生成的套料方案数
+    private Integer nestingMergeCount;      // 合并的需求组数
+    private java.math.BigDecimal avgUtilizationPct;  // 平均套料利用率(%)
 }
