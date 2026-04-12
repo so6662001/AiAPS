@@ -1,8 +1,13 @@
 package com.aiaps.service.inventory;
 
 import com.aiaps.common.exception.BizException;
+import com.aiaps.domain.aps.ApsSchedule;
+import com.aiaps.domain.inventory.InvStock;
 import com.aiaps.domain.production.PrdMaterialIssue;
+import com.aiaps.mapper.aps.ApsScheduleMapper;
+import com.aiaps.mapper.inventory.InvStockMapper;
 import com.aiaps.mapper.production.PrdMaterialIssueMapper;
+import com.aiaps.service.production.MixContractService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +20,9 @@ public class MaterialIssueService {
 
     private final PrdMaterialIssueMapper materialIssueMapper;
     private final StockService stockService;
+    private final MixContractService mixContractService;
+    private final ApsScheduleMapper scheduleMapper;
+    private final InvStockMapper stockMapper;
 
     @Transactional
     public void createIssue(PrdMaterialIssue issue) {
@@ -46,6 +54,30 @@ public class MaterialIssueService {
         }
         if (!"APPROVED".equals(issue.getIssueStatus())) {
             throw new BizException("领料单状态不允许执行: " + issue.getIssueStatus());
+        }
+
+        // Check contract compatibility before issuing
+        if (issue.getScheduleId() != null && issue.getStockId() != null) {
+            MixContractService.CheckResult mixCheck = mixContractService.check(issue.getScheduleId(), issue.getStockId());
+            if (!mixCheck.isMatch() && !mixCheck.isMixAllowed()) {
+                throw new BizException("窜料检查未通过: " + mixCheck.getMessage());
+            }
+            if (!mixCheck.isMatch() && mixCheck.isMixAllowed()) {
+                ApsSchedule schedule = scheduleMapper.selectById(issue.getScheduleId());
+                InvStock stock = stockMapper.selectById(issue.getStockId());
+                if (schedule != null && stock != null) {
+                    mixContractService.recordMix(
+                            issue.getScheduleId(),
+                            schedule.getContractNo(),
+                            stock.getContractNo(),
+                            issue.getStockId(),
+                            issue.getPrdtId(),
+                            issue.getIssueWeight(),
+                            "领料时窜料",
+                            operatedBy
+                    );
+                }
+            }
         }
 
         issue.setIssueStatus("ISSUED");
