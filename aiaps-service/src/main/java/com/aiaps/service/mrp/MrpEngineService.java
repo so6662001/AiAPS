@@ -71,17 +71,22 @@ public class MrpEngineService {
         runLogMapper.insert(runLog);
 
         try {
+            // 1. Build context (materials, BOMs, formulas)
             MrpContext context = buildContext();
 
+            // 2. Collect demands (OPEN/PARTIAL)
             List<DemDemandLine> demands = collectDemands();
             runLog.setDemandCount(demands.size());
 
+            // 3. Calculate LLC
             Map<String, Integer> llcMap = calculateLlc(context);
 
+            // 4. Group demands by (prdtId + patName + paName)
             Map<String, List<DemDemandLine>> demandGroups = demands.stream()
                     .collect(Collectors.groupingBy(d ->
                             d.getPrdtId() + "|" + nullSafe(d.getPatName()) + "|" + nullSafe(d.getPaName())));
 
+            // 5. Sort groups by LLC
             List<Map.Entry<String, List<DemDemandLine>>> sortedGroups = demandGroups.entrySet().stream()
                     .sorted((a, b) -> {
                         String keyA = "M:" + a.getValue().get(0).getPrdtId();
@@ -92,14 +97,17 @@ public class MrpEngineService {
                     })
                     .collect(Collectors.toList());
 
+            // 6. Process each group
             for (Map.Entry<String, List<DemDemandLine>> entry : sortedGroups) {
                 List<DemDemandLine> groupDemands = entry.getValue();
                 DemDemandLine sample = groupDemands.get(0);
 
+                // 6a. Sum total required weight
                 BigDecimal totalRequiredWeight = groupDemands.stream()
                         .map(d -> d.getRequiredWeight() != null ? d.getRequiredWeight() : BigDecimal.ZERO)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+                // 6b. Get available stock weight
                 BigDecimal availableWeight = BigDecimal.ZERO;
                 BigDecimal rawAvailable = stockMapper.selectAvailableWeight(
                         sample.getPrdtId(), sample.getPatName(), sample.getPaName());
@@ -107,24 +115,77 @@ public class MrpEngineService {
                     availableWeight = rawAvailable;
                 }
 
-                BigDecimal netWeight = totalRequiredWeight.subtract(availableWeight);
+                // 6c. Calculate net = total - available
+                BigDecimal netWeight = totalRequiredWeight.subtract(availableWeight).max(BigDecimal.ZERO);
+
                 if (netWeight.compareTo(BigDecimal.ZERO) <= 0) {
+                    // Fully covered by stock — create pegging for stock coverage
+                    for (DemDemandLine demand : groupDemands) {
+                        BigDecimal demandWeight = demand.getRequiredWeight() != null
+                                ? demand.getRequiredWeight() : BigDecimal.ZERO;
+                        createPegging(runLog.getRunId(), demand.getDemandLineId(),
+                                "STOCK", null, demandWeight);
+                    }
                     continue;
                 }
 
                 BasMaterial material = context.getMaterial(sample.getPrdtId());
 
+                // 6d. Apply lot sizing
+                netWeight = applyLotSizing(netWeight, material);
+
+                // 6e. Calculate lead time offset for start date
+                Date requiredDate = sample.getRequiredDate();
+                Date plannedStartDate = calcLeadTimeOffset(requiredDate, material);
+                Date plannedEndDate = requiredDate != null ? requiredDate : new Date();
+
+                // 6f. Determine order type
+                String orderType = determineOrderType(material);
+
+                // 6g-i. Distribute net proportionally to demands, create plan orders + pegging
+                // If stock partially covers, create pegging for the stock-covered portion
+                if (availableWeight.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal stockCoverRemaining = availableWeight;
+                    for (DemDemandLine demand : groupDemands) {
+                        BigDecimal demandWeight = demand.getRequiredWeight() != null
+                                ? demand.getRequiredWeight() : BigDecimal.ZERO;
+                        BigDecimal coveredByStock = demandWeight.min(stockCoverRemaining);
+                        if (coveredByStock.compareTo(BigDecimal.ZERO) > 0) {
+                            createPegging(runLog.getRunId(), demand.getDemandLineId(),
+                                    "STOCK", null, coveredByStock);
+                            stockCoverRemaining = stockCoverRemaining.subtract(coveredByStock);
+                        }
+                    }
+                }
+
                 for (DemDemandLine demand : groupDemands) {
+                    BigDecimal demandWeight = demand.getRequiredWeight() != null
+                            ? demand.getRequiredWeight() : BigDecimal.ZERO;
+                    BigDecimal proportion = totalRequiredWeight.compareTo(BigDecimal.ZERO) > 0
+                            ? demandWeight.divide(totalRequiredWeight, 6, RoundingMode.HALF_UP)
+                            : BigDecimal.ONE;
+                    BigDecimal orderWeight = netWeight.multiply(proportion)
+                            .setScale(3, RoundingMode.HALF_UP);
+                    if (orderWeight.compareTo(BigDecimal.ZERO) <= 0) {
+                        continue;
+                    }
+
+                    int seq = context.getPlannedOrders().size() + 1;
+                    String planOrderNo = generatePlanOrderNo(runLog, seq);
+
                     MrpContext.PlannedOrderDto order = new MrpContext.PlannedOrderDto();
                     order.setRunId(runLog.getRunId());
+                    order.setPlanOrderNo(planOrderNo);
                     order.setPrdtId(demand.getPrdtId());
                     order.setPatName(demand.getPatName());
                     order.setPaName(demand.getPaName());
                     order.setGradeFlexible(demand.getGradeFlexible());
                     order.setOriginFlexible(demand.getOriginFlexible());
-                    order.setOrderType("MFG");
-                    order.setPlannedWeight(demand.getRequiredWeight());
+                    order.setOrderType(orderType);
+                    order.setPlannedWeight(orderWeight);
                     order.setPlannedQty(demand.getRequiredQty());
+                    order.setPlannedStartDate(plannedStartDate);
+                    order.setPlannedEndDate(plannedEndDate);
                     order.setContractNo(demand.getContractNo());
                     order.setSourceDemandId(demand.getDemandId());
                     order.setSourceDemandLine(demand.getDemandLineId());
@@ -133,11 +194,20 @@ public class MrpEngineService {
                     order.setIsFirmed(false);
                     order.setCreatedTime(new Date());
 
-                    explodeBom(context, order, material, runLog.getRunId());
                     context.addPlannedOrder(order);
+
+                    // Create pegging for the plan order supply
+                    createPegging(runLog.getRunId(), demand.getDemandLineId(),
+                            "PLAN_ORDER", null, orderWeight);
+
+                    // 6j. Explode BOM for MFG orders
+                    if ("MFG".equals(orderType)) {
+                        explodeBom(context, order, material, runLog.getRunId());
+                    }
                 }
             }
 
+            // 7. Save MRP results + pegging
             saveMrpResults(runLog.getRunId(), context.getPlannedOrders());
 
             // Step 3.5: 套料自动合并优化
@@ -158,6 +228,23 @@ public class MrpEngineService {
                 log.warn("套料自动优化阶段异常: {}", ne.getMessage());
             }
 
+            // 8. Check safety stock
+            checkSafetyStock(context, runLog.getRunId());
+
+            // 9. Check exceptions
+            List<String> exceptions = checkExceptions(context);
+            if (!exceptions.isEmpty()) {
+                log.warn("MRP exceptions ({}): {}", exceptions.size(),
+                        String.join("; ", exceptions));
+                String excMsg = "异常数: " + exceptions.size() + "; " +
+                        String.join("; ", exceptions);
+                if (excMsg.length() > 500) {
+                    excMsg = excMsg.substring(0, 500);
+                }
+                runLog.setErrorMessage(excMsg);
+            }
+
+            // 10. Update run log with counts
             runLog.setPlanOrderCount(context.getPlannedOrders().size());
             runLog.setRunStatus("COMPLETED");
             runLog.setEndTime(new Date());
@@ -321,12 +408,16 @@ public class MrpEngineService {
             }
             if (details != null) {
                 for (BasBomDetail detail : details) {
+                    BasMaterial childMaterial = context.getMaterial(detail.getChildPrdtId());
+
                     MrpContext.PlannedOrderDto childOrder = new MrpContext.PlannedOrderDto();
                     childOrder.setRunId(runId);
+                    childOrder.setPlanOrderNo(generatePlanOrderNo(
+                            buildTempRunLog(runId), context.getPlannedOrders().size() + 1));
                     childOrder.setPrdtId(detail.getChildPrdtId());
                     childOrder.setPatName(parentOrder.getPatName());
                     childOrder.setPaName(parentOrder.getPaName());
-                    childOrder.setOrderType("MFG");
+                    childOrder.setOrderType(determineOrderType(childMaterial));
                     childOrder.setContractNo(parentOrder.getContractNo());
                     childOrder.setDemandSource("BOM_EXPLODE");
                     childOrder.setSourceDemandId(parentOrder.getSourceDemandId());
@@ -339,10 +430,22 @@ public class MrpEngineService {
 
                     BigDecimal qtyPer = detail.getQtyPer() != null ? detail.getQtyPer() : BigDecimal.ONE;
                     BigDecimal scrapRate = detail.getScrapRate() != null ? detail.getScrapRate() : BigDecimal.ZERO;
-                    BigDecimal parentQty = parentOrder.getPlannedQty() != null ? parentOrder.getPlannedQty() : BigDecimal.ZERO;
+                    BigDecimal parentQty = parentOrder.getPlannedQty() != null
+                            ? parentOrder.getPlannedQty() : BigDecimal.ZERO;
                     childOrder.setPlannedQty(parentQty.multiply(qtyPer)
                             .multiply(BigDecimal.ONE.add(scrapRate))
                             .setScale(3, RoundingMode.HALF_UP));
+
+                    BigDecimal parentWeight = parentOrder.getPlannedWeight() != null
+                            ? parentOrder.getPlannedWeight() : BigDecimal.ZERO;
+                    BigDecimal childWeight = parentWeight.multiply(qtyPer)
+                            .multiply(BigDecimal.ONE.add(scrapRate))
+                            .setScale(3, RoundingMode.HALF_UP);
+                    childOrder.setPlannedWeight(childWeight);
+
+                    childOrder.setPlannedStartDate(calcLeadTimeOffset(
+                            parentOrder.getPlannedStartDate(), childMaterial));
+                    childOrder.setPlannedEndDate(parentOrder.getPlannedStartDate());
 
                     context.addPlannedOrder(childOrder);
                 }
@@ -398,6 +501,8 @@ public class MrpEngineService {
                 } else {
                     MrpContext.PlannedOrderDto childOrder = new MrpContext.PlannedOrderDto();
                     childOrder.setRunId(runId);
+                    childOrder.setPlanOrderNo(generatePlanOrderNo(
+                            buildTempRunLog(runId), context.getPlannedOrders().size() + 1));
                     childOrder.setPatName(parentOrder.getPatName());
                     childOrder.setPaName(parentOrder.getPaName());
                     childOrder.setOrderType("MFG");
@@ -411,6 +516,8 @@ public class MrpEngineService {
                     childOrder.setRawCategoryCode(childCategoryCode);
                     childOrder.setBomLevel((parentOrder.getBomLevel() != null ? parentOrder.getBomLevel() : 0) + 1);
                     childOrder.setCreatedTime(new Date());
+                    childOrder.setPlannedStartDate(parentOrder.getPlannedStartDate());
+                    childOrder.setPlannedEndDate(parentOrder.getPlannedEndDate());
 
                     if (formula != null) {
                         BigDecimal qty = parentOrder.getPlannedWeight() != null
@@ -428,6 +535,93 @@ public class MrpEngineService {
                 }
             }
         }
+    }
+
+    private BigDecimal applyLotSizing(BigDecimal netWeight, BasMaterial material) {
+        if (material == null) return netWeight;
+        String policy = material.getLotPolicy();
+        if (policy == null || "LFL".equals(policy)) return netWeight;
+
+        if ("FOQ".equals(policy) && material.getFixedLotQty() != null
+                && material.getFixedLotQty().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal lots = netWeight.divide(material.getFixedLotQty(), 0, RoundingMode.CEILING);
+            netWeight = lots.multiply(material.getFixedLotQty());
+        }
+
+        if (material.getMinOrderQty() != null && netWeight.compareTo(material.getMinOrderQty()) < 0) {
+            netWeight = material.getMinOrderQty();
+        }
+
+        if (material.getLotMultiple() != null
+                && material.getLotMultiple().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal multiples = netWeight.divide(material.getLotMultiple(), 0, RoundingMode.CEILING);
+            netWeight = multiples.multiply(material.getLotMultiple());
+        }
+
+        return netWeight;
+    }
+
+    private Date calcLeadTimeOffset(Date requiredDate, BasMaterial material) {
+        if (requiredDate == null) return new Date();
+        int leadDays = (material != null && material.getLeadTimeDays() != null)
+                ? material.getLeadTimeDays() : 0;
+        int safetyDays = (material != null && material.getSafetyLeadDays() != null)
+                ? material.getSafetyLeadDays() : 0;
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(requiredDate);
+        cal.add(Calendar.DAY_OF_MONTH, -(leadDays + safetyDays));
+        return cal.getTime();
+    }
+
+    private String generatePlanOrderNo(MrpRunLog runLog, int seq) {
+        return String.format("PO-%d-%04d", runLog.getRunId(), seq);
+    }
+
+    private String determineOrderType(BasMaterial material) {
+        if (material == null) return "MFG";
+        String procType = material.getProcurementType();
+        if ("P".equals(procType)) return "PUR";
+        if ("O".equals(procType)) return "SUB";
+        return "MFG";
+    }
+
+    private void createPegging(Long runId, Long demandLineId, String supplyType,
+                                Long supplyId, BigDecimal weight) {
+        MrpPegging peg = new MrpPegging();
+        peg.setRunId(runId);
+        peg.setDemandType("DEMAND");
+        peg.setDemandId(demandLineId);
+        peg.setSupplyType(supplyType);
+        peg.setSupplyId(supplyId);
+        peg.setPeggedQty(weight);
+        peg.setPeggedWeight(weight);
+        peggingMapper.insert(peg);
+    }
+
+    private void checkSafetyStock(MrpContext context, Long runId) {
+        for (BasMaterial material : context.getMaterialMap().values()) {
+            if (material.getSafetyStockQty() == null
+                    || material.getSafetyStockQty().compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            // Simplified check — flag for future SSK plan order creation
+        }
+    }
+
+    private List<String> checkExceptions(MrpContext context) {
+        List<String> exceptions = new ArrayList<>();
+        for (MrpContext.PlannedOrderDto order : context.getPlannedOrders()) {
+            if (order.getPlannedStartDate() != null && order.getPlannedStartDate().before(new Date())) {
+                exceptions.add("PO " + order.getPlanOrderNo() + ": 提前期不足, 计划开始日已过期");
+            }
+        }
+        return exceptions;
+    }
+
+    private MrpRunLog buildTempRunLog(Long runId) {
+        MrpRunLog temp = new MrpRunLog();
+        temp.setRunId(runId);
+        return temp;
     }
 
     private MrpPlanOrder convertToEntity(MrpContext.PlannedOrderDto dto) {
