@@ -2,10 +2,13 @@ package com.aiaps.service.inventory;
 
 import com.aiaps.common.exception.BizException;
 import com.aiaps.domain.aps.ApsSchedule;
+import com.aiaps.domain.base.BasMaterial;
 import com.aiaps.domain.inventory.InvReceipt;
 import com.aiaps.domain.inventory.InvStock;
+import com.aiaps.domain.inventory.InvStockBind;
 import com.aiaps.domain.trace.TrcTraceLink;
 import com.aiaps.mapper.aps.ApsScheduleMapper;
+import com.aiaps.mapper.base.BasMaterialMapper;
 import com.aiaps.mapper.inventory.InvReceiptMapper;
 import com.aiaps.mapper.inventory.InvStockMapper;
 import com.aiaps.mapper.trace.TrcTraceLinkMapper;
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Date;
 import java.util.List;
 
@@ -28,6 +32,9 @@ public class ReceiptService {
     private final ApsScheduleMapper scheduleMapper;
     private final InvStockMapper stockMapper;
     private final TrcTraceLinkMapper traceLinkMapper;
+    private final BarcodeService barcodeService;
+    private final StockBindService stockBindService;
+    private final BasMaterialMapper materialMapper;
 
     @Transactional
     public InvReceipt createReceipt(InvReceipt receipt) {
@@ -111,6 +118,33 @@ public class ReceiptService {
         stock.setEnterDate(new Date());
 
         stockService.stockIn(stock, "RECEIPT", receipt.getReceiptId(), receipt.getReceiptNo(), receivedBy);
+
+        Long targetStockId = stock.getStockId();
+        String cardNo = stock.getCardNo();
+
+        if (receipt.getReceiptQty() != null && receipt.getReceiptQty().compareTo(BigDecimal.ZERO) > 0) {
+            int qtyPerBind = 6;
+            int totalQty = receipt.getReceiptQty().intValue();
+
+            List<InvStockBind> binds = stockBindService.createBindBatch(
+                    targetStockId, cardNo, totalQty, qtyPerBind,
+                    receipt.getReceiptWeight(), receipt.getContractNo(),
+                    receipt.getProductLength(), receipt.getLengthDisplay());
+
+            BasMaterial material = materialMapper.selectById(receipt.getPrdtId());
+            if (material != null && barcodeService.isBarcodeEnabled(material.getCategoryCode())) {
+                for (InvStockBind bind : binds) {
+                    BigDecimal itemWeight = bind.getBindWeight() != null && bind.getBindQty().compareTo(BigDecimal.ZERO) > 0
+                            ? bind.getBindWeight().divide(bind.getBindQty(), 6, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                    barcodeService.generateBarcodes(
+                            targetStockId, cardNo, bind.getBindNo(), bind.getBindId(),
+                            bind.getBindQty().intValue(), receipt.getPrdtId(),
+                            receipt.getPatName(), receipt.getPaName(),
+                            receipt.getProductLength(), itemWeight,
+                            receipt.getScheduleId(), receipt.getContractNo());
+                }
+            }
+        }
 
         receipt.setReceiptStatus("RECEIVED");
         receipt.setReceivedBy(receivedBy);
