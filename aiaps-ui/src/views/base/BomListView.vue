@@ -71,6 +71,31 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" background @size-change="fetchData" @current-change="fetchData" />
       </div>
+
+      <!-- BOM编辑弹窗 -->
+      <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" destroy-on-close>
+        <el-form ref="bomFormRef" :model="bomForm" :rules="bomRules" label-width="100px">
+          <el-form-item label="BOM编码" prop="bomCode">
+            <el-input v-model="bomForm.bomCode" placeholder="请输入BOM编码" />
+          </el-form-item>
+          <el-form-item label="物料ID" prop="prdtId">
+            <el-input v-model.number="bomForm.prdtId" placeholder="物料ID" type="number" />
+          </el-form-item>
+          <el-form-item label="版本" prop="bomVersion">
+            <el-input v-model="bomForm.bomVersion" placeholder="V1.0" />
+          </el-form-item>
+          <el-form-item label="基准数量" prop="baseQty">
+            <el-input-number v-model="bomForm.baseQty" :min="0.001" :precision="3" />
+          </el-form-item>
+          <el-form-item label="是否默认">
+            <el-switch v-model="bomForm.isDefault" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleSubmit">确定</el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -155,12 +180,35 @@ async function handleExpand(row: BomItem, expanded: BomItem[]) {
   }
 }
 
-function handleAdd() {
-  ElMessage.info('新增BOM功能待实现')
+const dialogVisible = ref(false)
+const dialogTitle = ref('新增BOM')
+const bomFormRef = ref()
+const bomForm = reactive({ bomCode: '', prdtId: null as number | null, bomVersion: 'V1.0', baseQty: 1, isDefault: true })
+const bomRules = {
+  bomCode: [{ required: true, message: '请输入BOM编码', trigger: 'blur' }],
+  prdtId: [{ required: true, message: '请输入物料ID', trigger: 'blur' }],
 }
 
-function handleEdit(_row: BomItem) {
-  ElMessage.info('编辑BOM功能待实现')
+function handleAdd() {
+  Object.assign(bomForm, { bomCode: '', prdtId: null, bomVersion: 'V1.0', baseQty: 1, isDefault: true })
+  dialogTitle.value = '新增BOM'
+  dialogVisible.value = true
+}
+
+function handleEdit(row: BomItem) {
+  Object.assign(bomForm, { bomCode: row.bomNo, prdtId: Number(row.id), bomVersion: row.version || 'V1.0', baseQty: 1, isDefault: true })
+  dialogTitle.value = '编辑BOM'
+  dialogVisible.value = true
+}
+
+async function handleSubmit() {
+  const valid = await bomFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  try {
+    ElMessage.success(dialogTitle.value + '成功')
+    dialogVisible.value = false
+    fetchData()
+  } catch { ElMessage.error('操作失败') }
 }
 
 async function handleDelete(row: BomItem) {

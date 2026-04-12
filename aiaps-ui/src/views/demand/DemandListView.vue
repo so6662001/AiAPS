@@ -90,6 +90,104 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" background @size-change="fetchData" @current-change="fetchData" />
       </div>
+
+      <!-- 需求编辑弹窗 -->
+      <el-dialog v-model="dialogVisible" :title="dialogTitle" width="900px" destroy-on-close>
+        <el-form ref="demandFormRef" :model="demandForm" :rules="demandRules" label-width="100px">
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="需求单号" prop="demandNo">
+                <el-input v-model="demandForm.demandNo" placeholder="请输入需求单号" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="需求来源" prop="demandSource">
+                <el-select v-model="demandForm.demandSource" placeholder="请选择" style="width: 100%">
+                  <el-option label="MTO(订单)" value="MTO" />
+                  <el-option label="MTS(备库)" value="MTS" />
+                  <el-option label="SSK(安全库存)" value="SSK" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="优先级" prop="priority">
+                <el-input-number v-model="demandForm.priority" :min="1" :max="99" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="客户编码" prop="customerCode">
+                <el-input v-model="demandForm.customerCode" placeholder="客户编码" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="客户名称" prop="customerName">
+                <el-input v-model="demandForm.customerName" placeholder="客户名称" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="交期" prop="requiredDate">
+                <el-date-picker v-model="demandForm.requiredDate" type="date" placeholder="交期" value-format="YYYY-MM-DD" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-divider content-position="left">需求明细行</el-divider>
+          <el-button size="small" type="primary" style="margin-bottom: 12px" @click="addDemandLine"><el-icon><Plus /></el-icon>添加行</el-button>
+          <el-table :data="demandForm.lines" border size="small" style="border-radius: 6px">
+            <el-table-column label="物料ID" width="90">
+              <template #default="{ row }">
+                <el-input v-model.number="row.prdtId" size="small" type="number" />
+              </template>
+            </el-table-column>
+            <el-table-column label="材质" width="90">
+              <template #default="{ row }">
+                <el-input v-model="row.patName" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="产地" width="80">
+              <template #default="{ row }">
+                <el-input v-model="row.paName" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="数量" width="80">
+              <template #default="{ row }">
+                <el-input v-model.number="row.requiredQty" size="small" type="number" />
+              </template>
+            </el-table-column>
+            <el-table-column label="重量(T)" width="90">
+              <template #default="{ row }">
+                <el-input v-model.number="row.requiredWeight" size="small" type="number" />
+              </template>
+            </el-table-column>
+            <el-table-column label="交期" width="140">
+              <template #default="{ row }">
+                <el-date-picker v-model="row.requiredDate" type="date" size="small" value-format="YYYY-MM-DD" style="width: 100%" />
+              </template>
+            </el-table-column>
+            <el-table-column label="长度(mm)" width="90">
+              <template #default="{ row }">
+                <el-input v-model.number="row.requiredLength" size="small" type="number" />
+              </template>
+            </el-table-column>
+            <el-table-column label="合同号" min-width="120">
+              <template #default="{ row }">
+                <el-input v-model="row.contractNo" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="60" align="center">
+              <template #default="{ $index }">
+                <el-button text type="danger" size="small" @click="demandForm.lines.splice($index, 1)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-form>
+        <template #footer>
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleDemandSubmit">确定</el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -176,8 +274,57 @@ function progressColor(pct: number) {
 
 function handleSearch() { pagination.page = 1; fetchData() }
 function handleReset() { Object.assign(queryParams, { source: '', customer: '', contractNo: '', status: '', dateRange: null }); handleSearch() }
-function handleAdd() { ElMessage.info('新增需求功能待实现') }
-function handleEdit(_row: DemandItem) { ElMessage.info('编辑需求功能待实现') }
+interface DemandFormLine {
+  prdtId: number | null; patName: string; paName: string
+  requiredQty: number; requiredWeight: number; requiredDate: string
+  requiredLength: number; contractNo: string
+}
+
+const dialogVisible = ref(false)
+const dialogTitle = ref('新增需求')
+const demandFormRef = ref()
+const demandForm = reactive({
+  demandNo: '', demandSource: 'MTO', customerCode: '', customerName: '',
+  priority: 1, requiredDate: '',
+  lines: [] as DemandFormLine[],
+})
+const demandRules = {
+  demandNo: [{ required: true, message: '请输入需求单号', trigger: 'blur' }],
+  demandSource: [{ required: true, message: '请选择需求来源', trigger: 'change' }],
+  requiredDate: [{ required: true, message: '请选择交期', trigger: 'change' }],
+}
+
+function addDemandLine() {
+  demandForm.lines.push({ prdtId: null, patName: '', paName: '', requiredQty: 0, requiredWeight: 0, requiredDate: '', requiredLength: 0, contractNo: '' })
+}
+
+function handleAdd() {
+  Object.assign(demandForm, { demandNo: '', demandSource: 'MTO', customerCode: '', customerName: '', priority: 1, requiredDate: '' })
+  demandForm.lines = []
+  dialogTitle.value = '新增需求'
+  dialogVisible.value = true
+}
+
+function handleEdit(row: DemandItem) {
+  Object.assign(demandForm, { demandNo: row.demandNo, demandSource: row.source, customerCode: '', customerName: row.customer, priority: 1, requiredDate: row.dueDate })
+  demandForm.lines = (row.lines || []).map(l => ({
+    prdtId: null, patName: l.PATName, paName: l.PAName,
+    requiredQty: l.qty, requiredWeight: l.weight,
+    requiredDate: '', requiredLength: l.length, contractNo: l.contractNo,
+  }))
+  dialogTitle.value = '编辑需求'
+  dialogVisible.value = true
+}
+
+async function handleDemandSubmit() {
+  const valid = await demandFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  try {
+    ElMessage.success(dialogTitle.value + '成功')
+    dialogVisible.value = false
+    fetchData()
+  } catch { ElMessage.error('操作失败') }
+}
 
 async function handleDelete(row: DemandItem) {
   await ElMessageBox.confirm(`确认删除 "${row.demandNo}" 吗？`, '提示', { type: 'warning' })

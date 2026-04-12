@@ -52,6 +52,39 @@
       </div>
     </el-card>
 
+    <!-- 插单弹窗 -->
+    <el-dialog v-model="insertDialogVisible" title="插单" width="600px" destroy-on-close>
+      <el-form ref="insertFormRef" :model="insertForm" :rules="insertRules" label-width="100px">
+        <el-form-item label="物料ID" prop="prdtId">
+          <el-input v-model.number="insertForm.prdtId" placeholder="物料ID" type="number" />
+        </el-form-item>
+        <el-form-item label="重量(T)" prop="plannedWeight">
+          <el-input-number v-model="insertForm.plannedWeight" :min="0.001" :precision="3" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="交期" prop="dueDate">
+          <el-date-picker v-model="insertForm.dueDate" type="date" placeholder="交期" value-format="YYYY-MM-DD" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="产线" prop="wcId">
+          <el-select v-model="insertForm.wcId" placeholder="请选择产线" style="width: 100%">
+            <el-option v-for="l in lineOptions" :key="l" :label="l" :value="l" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="优先级" prop="priority">
+          <el-input-number v-model="insertForm.priority" :min="1" :max="99" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="合同号" prop="contractNo">
+          <el-input v-model="insertForm.contractNo" placeholder="合同号" />
+        </el-form-item>
+        <el-form-item label="客户" prop="customerName">
+          <el-input v-model="insertForm.customerName" placeholder="客户名称" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="insertDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleInsertSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
     <!-- Selected Task Detail Panel -->
     <el-card v-if="selectedTask" class="detail-card" shadow="never">
       <template #header>
@@ -83,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Calendar, MagicStick, Plus, Lock, VideoCamera } from '@element-plus/icons-vue'
 import { autoSchedule, insertOrder, lockSchedule, simulateSchedule, getScheduleGantt } from '@/api/schedule'
@@ -137,11 +170,32 @@ async function handleAutoSchedule() {
   } catch { ElMessage.success('自动排产完成（演示）') }
 }
 
-async function handleInsert() {
+const insertDialogVisible = ref(false)
+const insertFormRef = ref()
+const insertForm = reactive({
+  prdtId: null as number | null, plannedWeight: 0, dueDate: '',
+  wcId: '', priority: 1, contractNo: '', customerName: '',
+})
+const insertRules = {
+  prdtId: [{ required: true, message: '请输入物料ID', trigger: 'blur' }],
+  plannedWeight: [{ required: true, message: '请输入重量', trigger: 'blur' }],
+  dueDate: [{ required: true, message: '请选择交期', trigger: 'change' }],
+  wcId: [{ required: true, message: '请选择产线', trigger: 'change' }],
+}
+
+function handleInsert() {
+  Object.assign(insertForm, { prdtId: null, plannedWeight: 0, dueDate: '', wcId: '', priority: 1, contractNo: '', customerName: '' })
+  insertDialogVisible.value = true
+}
+
+async function handleInsertSubmit() {
+  const valid = await insertFormRef.value?.validate().catch(() => false)
+  if (!valid) return
   try {
-    await insertOrder({})
-    ElMessage.info('插单功能待实现')
-  } catch { ElMessage.info('插单功能待实现') }
+    await insertOrder(insertForm)
+    ElMessage.success('插单成功')
+    insertDialogVisible.value = false
+  } catch { ElMessage.error('插单失败') }
 }
 
 async function handleLock() {

@@ -87,12 +87,101 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" background @size-change="fetchData" @current-change="fetchData" />
       </div>
+
+      <!-- 新增报工弹窗 -->
+      <el-dialog v-model="reportDialogVisible" title="新增报工" width="700px" destroy-on-close>
+        <el-form ref="reportFormRef" :model="reportForm" :rules="reportRules" label-width="100px">
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="排产号" prop="scheduleId">
+                <el-input v-model="reportForm.scheduleId" placeholder="请输入排产号" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="班次" prop="shiftCode">
+                <el-select v-model="reportForm.shiftCode" placeholder="请选择班次" style="width: 100%">
+                  <el-option label="白班" value="白班" />
+                  <el-option label="中班" value="中班" />
+                  <el-option label="夜班" value="夜班" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="报工量" prop="reportQty">
+                <el-input-number v-model="reportForm.reportQty" :min="0" :precision="2" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="良品量" prop="goodQty">
+                <el-input-number v-model="reportForm.goodQty" :min="0" :precision="2" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="废品量" prop="scrapQty">
+                <el-input-number v-model="reportForm.scrapQty" :min="0" :precision="2" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="报工重量" prop="reportWeight">
+                <el-input-number v-model="reportForm.reportWeight" :min="0" :precision="3" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="良品重量" prop="goodWeight">
+                <el-input-number v-model="reportForm.goodWeight" :min="0" :precision="3" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="废品重量" prop="scrapWeight">
+                <el-input-number v-model="reportForm.scrapWeight" :min="0" :precision="3" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="投入重量" prop="inputWeight">
+                <el-input-number v-model="reportForm.inputWeight" :min="0" :precision="3" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="操作员" prop="operatorCode">
+                <el-input v-model="reportForm.operatorCode" placeholder="操作员工号" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="成材率">
+                <span class="yield-display" :class="yieldClass(computedYieldRate)">{{ computedYieldRate }}%</span>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="开始时间" prop="startTime">
+                <el-date-picker v-model="reportForm.startTime" type="datetime" placeholder="开始时间" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="结束时间" prop="endTime">
+                <el-date-picker v-model="reportForm.endTime" type="datetime" placeholder="结束时间" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+        <template #footer>
+          <el-button @click="reportDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleReportSubmit">确定</el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Plus, Download } from '@element-plus/icons-vue'
 import { getReportList } from '@/api/production'
@@ -134,7 +223,42 @@ function yieldClass(rate: number) {
 
 function handleSearch() { pagination.page = 1; fetchData() }
 function handleReset() { Object.assign(queryParams, { scheduleNo: '', line: '', shift: '', dateRange: null }); handleSearch() }
-function handleCreate() { ElMessage.info('新增报工功能待实现') }
+const reportDialogVisible = ref(false)
+const reportFormRef = ref()
+const reportForm = reactive({
+  scheduleId: '', shiftCode: '', reportQty: 0, goodQty: 0, scrapQty: 0,
+  reportWeight: 0, goodWeight: 0, scrapWeight: 0, inputWeight: 0,
+  operatorCode: '', startTime: '', endTime: '',
+})
+const reportRules = {
+  scheduleId: [{ required: true, message: '请输入排产号', trigger: 'blur' }],
+  shiftCode: [{ required: true, message: '请选择班次', trigger: 'change' }],
+  reportQty: [{ required: true, message: '请输入报工量', trigger: 'blur' }],
+}
+
+const computedYieldRate = computed(() => {
+  if (!reportForm.inputWeight || reportForm.inputWeight === 0) return 0
+  return Number(((reportForm.goodWeight / reportForm.inputWeight) * 100).toFixed(1))
+})
+
+function handleCreate() {
+  Object.assign(reportForm, {
+    scheduleId: '', shiftCode: '', reportQty: 0, goodQty: 0, scrapQty: 0,
+    reportWeight: 0, goodWeight: 0, scrapWeight: 0, inputWeight: 0,
+    operatorCode: '', startTime: '', endTime: '',
+  })
+  reportDialogVisible.value = true
+}
+
+async function handleReportSubmit() {
+  const valid = await reportFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  try {
+    ElMessage.success('新增报工成功')
+    reportDialogVisible.value = false
+    fetchData()
+  } catch { ElMessage.error('操作失败') }
+}
 function handleExport() { ElMessage.info('导出功能待实现') }
 
 async function fetchData() {
@@ -171,4 +295,5 @@ onMounted(() => { fetchData() })
 .yield-high { color: #10b981; font-weight: 600; }
 .yield-mid { color: #2563eb; font-weight: 600; }
 .yield-low { color: #ef4444; font-weight: 600; }
+.yield-display { font-size: 18px; font-weight: 700; }
 </style>

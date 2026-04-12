@@ -91,6 +91,29 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100, 200]" layout="total, sizes, prev, pager, next, jumper" background @size-change="fetchData" @current-change="fetchData" />
       </div>
+
+      <!-- 详情抽屉 -->
+      <el-drawer v-model="drawerVisible" title="计划订单详情" size="500px">
+        <template v-if="drawerRow">
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="订单号">{{ drawerRow.orderNo }}</el-descriptions-item>
+            <el-descriptions-item label="物料/规格">{{ drawerRow.materialSpec }}</el-descriptions-item>
+            <el-descriptions-item label="材质"><span class="grade-cell">{{ drawerRow.grade }}</span></el-descriptions-item>
+            <el-descriptions-item label="产地">{{ drawerRow.origin }}</el-descriptions-item>
+            <el-descriptions-item label="重量(T)">{{ drawerRow.weight }}</el-descriptions-item>
+            <el-descriptions-item label="长度(mm)">{{ drawerRow.length || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="合同号">{{ drawerRow.contractNo }}</el-descriptions-item>
+            <el-descriptions-item label="类型">
+              <el-tag :type="typeTagMap[drawerRow.orderType] || 'info'" size="small" effect="light">{{ typeLabel[drawerRow.orderType] || drawerRow.orderType }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="开始日期">{{ drawerRow.startDate }}</el-descriptions-item>
+            <el-descriptions-item label="完成日期">{{ drawerRow.endDate }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag :type="statusTagMap[drawerRow.status] || 'info'" size="small" effect="light" round>{{ statusLabelMap[drawerRow.status] || drawerRow.status }}</el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+        </template>
+      </el-drawer>
     </el-card>
   </div>
 </template>
@@ -135,7 +158,13 @@ const tableData = ref<PlanOrder[]>([
 function handleSearch() { pagination.page = 1; fetchData() }
 function handleReset() { Object.assign(queryParams, { grade: '', origin: '', contractNo: '', orderType: '', status: '', dateRange: null }); handleSearch() }
 function handleSelection(sel: PlanOrder[]) { selectedOrders.value = sel }
-function handleView(_row: PlanOrder) { ElMessage.info('详情功能待实现') }
+const drawerVisible = ref(false)
+const drawerRow = ref<PlanOrder | null>(null)
+
+function handleView(row: PlanOrder) {
+  drawerRow.value = row
+  drawerVisible.value = true
+}
 function handleExport() { ElMessage.info('导出功能待实现') }
 
 async function handleBatchConfirm() {

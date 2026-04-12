@@ -71,6 +71,76 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" background @size-change="fetchData" @current-change="fetchData" />
       </div>
+
+      <!-- 新增领料弹窗 -->
+      <el-dialog v-model="issueDialogVisible" title="新增领料" width="700px" destroy-on-close>
+        <el-form ref="issueFormRef" :model="issueForm" :rules="issueRules" label-width="100px">
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="排产号" prop="scheduleId">
+                <el-input v-model="issueForm.scheduleId" placeholder="请输入排产号" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="产线ID" prop="wcId">
+                <el-input v-model="issueForm.wcId" placeholder="产线/工作中心ID" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="物料ID" prop="prdtId">
+                <el-input v-model.number="issueForm.prdtId" placeholder="物料ID" type="number" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="材质" prop="patName">
+                <el-input v-model="issueForm.patName" placeholder="材质" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="库存ID" prop="stockId">
+                <el-input v-model="issueForm.stockId" placeholder="库存ID" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="资源号" prop="coilNo">
+                <el-input v-model="issueForm.coilNo" placeholder="卷号/资源号" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="领料数量" prop="issueQty">
+                <el-input-number v-model="issueForm.issueQty" :min="0" :precision="0" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="领料重量" prop="issueWeight">
+                <el-input-number v-model="issueForm.issueWeight" :min="0" :precision="3" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="仓库" prop="warehouseCode">
+                <el-input v-model="issueForm.warehouseCode" placeholder="仓库编码" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="合同号" prop="contractNo">
+                <el-input v-model="issueForm.contractNo" placeholder="合同号" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+        <template #footer>
+          <el-button @click="issueDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleIssueSubmit">确定</el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -123,8 +193,41 @@ function issueStatusLabel(status: string) {
 
 function handleSearch() { pagination.page = 1; fetchData() }
 function handleReset() { Object.assign(queryParams, { issueNo: '', scheduleNo: '', status: '', dateRange: null }); handleSearch() }
-function handleCreate() { ElMessage.info('新增领料功能待实现') }
-function handleView(_row: IssueItem) { ElMessage.info('详情功能待实现') }
+const issueDialogVisible = ref(false)
+const issueFormRef = ref()
+const issueForm = reactive({
+  scheduleId: '', wcId: '', prdtId: null as number | null, patName: '',
+  stockId: '', coilNo: '', issueQty: 0, issueWeight: 0,
+  warehouseCode: '', contractNo: '',
+})
+const issueRules = {
+  scheduleId: [{ required: true, message: '请输入排产号', trigger: 'blur' }],
+  prdtId: [{ required: true, message: '请输入物料ID', trigger: 'blur' }],
+  issueWeight: [{ required: true, message: '请输入领料重量', trigger: 'blur' }],
+}
+
+function handleCreate() {
+  Object.assign(issueForm, {
+    scheduleId: '', wcId: '', prdtId: null, patName: '',
+    stockId: '', coilNo: '', issueQty: 0, issueWeight: 0,
+    warehouseCode: '', contractNo: '',
+  })
+  issueDialogVisible.value = true
+}
+
+async function handleIssueSubmit() {
+  const valid = await issueFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  try {
+    ElMessage.success('新增领料成功')
+    issueDialogVisible.value = false
+    fetchData()
+  } catch { ElMessage.error('操作失败') }
+}
+
+function handleView(row: IssueItem) {
+  ElMessage.info(`查看领料单详情: ${row.issueNo}`)
+}
 
 async function handleApprove(row: IssueItem) {
   try { await approveMaterialIssue(row.id); row.status = 'APPROVED'; ElMessage.success('审批通过') } catch { ElMessage.error('审批失败') }

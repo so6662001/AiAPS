@@ -71,6 +71,45 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" background @size-change="fetchData" @current-change="fetchData" />
       </div>
+
+      <!-- 详情抽屉 -->
+      <el-drawer v-model="drawerVisible" title="排产详情" size="560px">
+        <template v-if="drawerRow">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="排产号" :span="2">{{ drawerRow.scheduleNo }}</el-descriptions-item>
+            <el-descriptions-item label="物料/规格" :span="2">{{ drawerRow.materialSpec }}</el-descriptions-item>
+            <el-descriptions-item label="材质"><span class="grade-cell">{{ drawerRow.grade }}</span></el-descriptions-item>
+            <el-descriptions-item label="产地">{{ drawerRow.origin }}</el-descriptions-item>
+            <el-descriptions-item label="重量(T)">{{ drawerRow.weight }}</el-descriptions-item>
+            <el-descriptions-item label="长度(mm)">{{ drawerRow.length || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="合同号">{{ drawerRow.contractNo }}</el-descriptions-item>
+            <el-descriptions-item label="产线">{{ drawerRow.line }}</el-descriptions-item>
+            <el-descriptions-item label="模具">{{ drawerRow.mold }}</el-descriptions-item>
+            <el-descriptions-item label="流向">{{ drawerRow.flow }}</el-descriptions-item>
+            <el-descriptions-item label="计划开始">{{ drawerRow.startDate }}</el-descriptions-item>
+            <el-descriptions-item label="计划结束">{{ drawerRow.endDate }}</el-descriptions-item>
+            <el-descriptions-item label="状态" :span="2">
+              <el-tag :type="statusTypeMap[drawerRow.status] || 'info'" size="small" effect="light" round>{{ statusLabelMap[drawerRow.status] || drawerRow.status }}</el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-divider content-position="left">工序列表</el-divider>
+          <el-table :data="drawerOperations" border size="small" style="border-radius: 6px">
+            <el-table-column prop="seq" label="序号" width="60" align="center" />
+            <el-table-column prop="opName" label="工序名称" min-width="120" />
+            <el-table-column prop="wcName" label="工作中心" min-width="110" />
+            <el-table-column prop="planStart" label="计划开始" min-width="140" />
+            <el-table-column prop="planEnd" label="计划结束" min-width="140" />
+            <el-table-column label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'done' ? 'success' : row.status === 'running' ? '' : 'info'" size="small" effect="light" round>
+                  {{ row.status === 'done' ? '完成' : row.status === 'running' ? '进行中' : '待执行' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+      </el-drawer>
     </el-card>
   </div>
 </template>
@@ -117,7 +156,18 @@ const tableData = ref<ScheduleItem[]>([
 
 function handleSearch() { pagination.page = 1; fetchData() }
 function handleReset() { Object.assign(queryParams, { line: '', grade: '', contractNo: '', status: '', dateRange: null }); handleSearch() }
-function handleView(_row: ScheduleItem) { ElMessage.info('详情功能待实现') }
+const drawerVisible = ref(false)
+const drawerRow = ref<ScheduleItem | null>(null)
+const drawerOperations = ref([
+  { seq: 1, opName: '开卷', wcName: '开卷机 #1', planStart: '2026-03-20 08:00', planEnd: '2026-03-20 09:00', status: 'done' },
+  { seq: 2, opName: '纵剪', wcName: '纵剪线 #1', planStart: '2026-03-20 09:00', planEnd: '2026-03-20 14:00', status: 'running' },
+  { seq: 3, opName: '打包', wcName: '打包机 #1', planStart: '2026-03-20 14:00', planEnd: '2026-03-20 16:00', status: 'pending' },
+])
+
+function handleView(row: ScheduleItem) {
+  drawerRow.value = row
+  drawerVisible.value = true
+}
 function handleConfirm(_row: ScheduleItem) { ElMessage.success('已确认排产单（演示）') }
 function handleExport() { ElMessage.info('导出功能待实现') }
 

@@ -72,11 +72,15 @@
               </el-radio-group>
             </div>
           </template>
-          <!-- ECharts integration point -->
-          <div id="heatmap-container" class="chart-placeholder">
-            <div class="placeholder-inner">
-              <el-icon :size="48" color="#cbd5e1"><TrendCharts /></el-icon>
-              <p>ECharts 热力图渲染区域</p>
+          <div class="heatmap-grid">
+            <div class="heatmap-header">
+              <span></span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span>
+            </div>
+            <div v-for="line in heatmapData" :key="line.name" class="heatmap-row">
+              <span class="heatmap-label">{{ line.name }}</span>
+              <span v-for="(val, i) in line.values" :key="i" class="heatmap-cell" :style="{ background: getHeatColor(val) }">
+                {{ val }}%
+              </span>
             </div>
           </div>
         </el-card>
@@ -139,6 +143,20 @@ const urgentItems = ref([
   { id: '4', title: '制管线#2 计划停机维护提醒，预计恢复时间 2026-03-20 08:00', level: 'medium', time: '2小时前' },
   { id: '5', title: 'MRP运行异常：3条需求无法满足交期要求，请检查产能', level: 'high', time: '3小时前' },
 ])
+
+const heatmapData = ref([
+  { name: '焊管1', values: [92, 88, 75, 82, 70] },
+  { name: '焊管2', values: [78, 85, 90, 68, 72] },
+  { name: '开平线', values: [65, 70, 82, 88, 60] },
+  { name: '分剪线', values: [80, 75, 78, 72, 85] },
+  { name: '剪切1', values: [45, 50, 55, 48, 42] },
+])
+
+function getHeatColor(val: number) {
+  if (val >= 90) return '#ef4444'
+  if (val >= 70) return '#f59e0b'
+  return '#10b981'
+}
 
 function getLoadColor(rate: number) {
   if (rate >= 90) return '#ef4444'
@@ -257,25 +275,11 @@ onMounted(async () => {
   text-align: right;
 }
 
-.chart-placeholder {
-  height: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px dashed #e2e8f0;
-}
-
-.placeholder-inner {
-  text-align: center;
-  color: #94a3b8;
-
-  p {
-    margin-top: 12px;
-    font-size: 13px;
-  }
-}
+.heatmap-grid { font-size: 12px; padding: 8px; }
+.heatmap-header, .heatmap-row { display: grid; grid-template-columns: 60px repeat(5, 1fr); gap: 4px; margin-bottom: 4px; }
+.heatmap-header span { text-align: center; color: #64748b; font-weight: 600; }
+.heatmap-label { font-weight: 600; color: #1e293b; line-height: 32px; }
+.heatmap-cell { text-align: center; line-height: 32px; border-radius: 4px; color: #fff; font-weight: 600; }
 
 .urgent-list {
   display: flex;

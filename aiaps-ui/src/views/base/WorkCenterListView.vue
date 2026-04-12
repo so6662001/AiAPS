@@ -68,6 +68,45 @@
       <div class="pagination-wrap">
         <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" background @size-change="fetchData" @current-change="fetchData" />
       </div>
+
+      <!-- 工作中心编辑弹窗 -->
+      <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" destroy-on-close>
+        <el-form ref="wcFormRef" :model="wcForm" :rules="wcRules" label-width="100px">
+          <el-form-item label="编号" prop="wcCode">
+            <el-input v-model="wcForm.wcCode" placeholder="请输入编号" />
+          </el-form-item>
+          <el-form-item label="名称" prop="wcName">
+            <el-input v-model="wcForm.wcName" placeholder="请输入名称" />
+          </el-form-item>
+          <el-form-item label="类型" prop="wcType">
+            <el-select v-model="wcForm.wcType" placeholder="请选择类型" style="width: 100%">
+              <el-option label="产线" value="LINE" />
+              <el-option label="机台" value="MACHINE" />
+              <el-option label="工位" value="STATION" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="产能单位" prop="capacityUnit">
+            <el-input v-model="wcForm.capacityUnit" placeholder="T/班" />
+          </el-form-item>
+          <el-form-item label="标准产能" prop="stdCapacity">
+            <el-input-number v-model="wcForm.stdCapacity" :min="0" :precision="1" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="班制" prop="shiftMode">
+            <el-select v-model="wcForm.shiftMode" placeholder="请选择班制" style="width: 100%">
+              <el-option label="三班" value="3S" />
+              <el-option label="两班" value="2S" />
+              <el-option label="一班" value="1S" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="每班工时" prop="hoursPerShift">
+            <el-input-number v-model="wcForm.hoursPerShift" :min="1" :max="12" :precision="1" style="width: 100%" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleWcSubmit">确定</el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -110,8 +149,40 @@ const tableData = ref<WorkCenter[]>([
 
 function handleSearch() { pagination.page = 1; fetchData() }
 function handleReset() { Object.assign(queryParams, { keyword: '', type: '', status: '' }); handleSearch() }
-function handleAdd() { ElMessage.info('新增功能待实现') }
-function handleEdit(_row: WorkCenter) { ElMessage.info('编辑功能待实现') }
+const dialogVisible = ref(false)
+const dialogTitle = ref('新增工作中心')
+const wcFormRef = ref()
+const wcForm = reactive({ wcCode: '', wcName: '', wcType: 'LINE', capacityUnit: 'T/班', stdCapacity: 100, shiftMode: '3S', hoursPerShift: 8 })
+const wcRules = {
+  wcCode: [{ required: true, message: '请输入编号', trigger: 'blur' }],
+  wcName: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+  wcType: [{ required: true, message: '请选择类型', trigger: 'change' }],
+}
+let editingId: string | null = null
+
+function handleAdd() {
+  Object.assign(wcForm, { wcCode: '', wcName: '', wcType: 'LINE', capacityUnit: 'T/班', stdCapacity: 100, shiftMode: '3S', hoursPerShift: 8 })
+  editingId = null
+  dialogTitle.value = '新增工作中心'
+  dialogVisible.value = true
+}
+
+function handleEdit(row: WorkCenter) {
+  Object.assign(wcForm, { wcCode: row.code, wcName: row.name, wcType: 'LINE', capacityUnit: 'T/班', stdCapacity: row.capacity, shiftMode: row.shiftMode === '三班' ? '3S' : row.shiftMode === '两班' ? '2S' : '1S', hoursPerShift: 8 })
+  editingId = row.id
+  dialogTitle.value = '编辑工作中心'
+  dialogVisible.value = true
+}
+
+async function handleWcSubmit() {
+  const valid = await wcFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  try {
+    ElMessage.success(dialogTitle.value + '成功')
+    dialogVisible.value = false
+    fetchData()
+  } catch { ElMessage.error('操作失败') }
+}
 async function handleDelete(row: WorkCenter) {
   await ElMessageBox.confirm(`确认删除 "${row.name}" 吗？`, '提示', { type: 'warning' })
   try { await deleteWorkCenter(row.id); ElMessage.success('删除成功'); fetchData() } catch { ElMessage.error('删除失败') }
