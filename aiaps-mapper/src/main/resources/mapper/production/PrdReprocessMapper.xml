@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.production.PrdReprocessMapper">
+
+    <select id="selectBySourceScheduleId" resultType="com.aiaps.domain.production.PrdReprocess">
+        SELECT *
+        FROM prd_reprocess
+        WHERE source_schedule_id = #{scheduleId}
+        ORDER BY created_time
+    </select>
+
+</mapper>
