@@ -78,6 +78,29 @@ public class ScheduleEngineService {
             BasMaterial material = materialMapper.selectById(planOrder.getPrdtId());
             schedule.setOutputFlowType(inferOutputFlowType(material));
 
+            // Multi-stage scheduling fields
+            if (material != null) {
+                String matType = material.getMaterialType();
+                if ("RAW".equals(matType)) {
+                    schedule.setSchedulePhase("PREP");
+                    schedule.setScheduleLevel("RAW");
+                } else if ("SEMI".equals(matType)) {
+                    schedule.setSchedulePhase("MFG");
+                    schedule.setScheduleLevel("PRODUCT");
+                } else {
+                    schedule.setSchedulePhase("MFG");
+                    schedule.setScheduleLevel("PRODUCT");
+                }
+            }
+
+            // Raw material info from plan order
+            schedule.setRawGradeCode(planOrder.getRawGradeCode());
+            schedule.setRawOriginCode(planOrder.getRawOriginCode());
+            if (planOrder.getMatchedStockId() != null) {
+                schedule.setRawStockId(planOrder.getMatchedStockId());
+                schedule.setRawCoilNo(planOrder.getMatchedCoilNo());
+            }
+
             List<BasRoutingOper> routingOpers = findRoutingOpers(planOrder.getPrdtId());
 
             List<ApsScheduleOper> opers = new ArrayList<>();

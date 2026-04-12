@@ -8,6 +8,7 @@ import com.aiaps.domain.base.BasCategoryBom;
 import com.aiaps.domain.base.BasMaterial;
 import com.aiaps.domain.base.BasSpecFormula;
 import com.aiaps.domain.demand.DemDemandLine;
+import com.aiaps.domain.inventory.InvStock;
 import com.aiaps.domain.mrp.MrpPegging;
 import com.aiaps.domain.mrp.MrpPlanOrder;
 import com.aiaps.domain.mrp.MrpRunLog;
@@ -113,6 +114,17 @@ public class MrpEngineService {
                         sample.getPrdtId(), sample.getPatName(), sample.getPaName());
                 if (rawAvailable != null) {
                     availableWeight = rawAvailable;
+                }
+
+                // Try to match specific stock
+                if (availableWeight.compareTo(BigDecimal.ZERO) > 0) {
+                    List<InvStock> matchedStocks = stockMapper.selectAvailable(
+                        sample.getPrdtId(), sample.getPatName(), sample.getPaName());
+                    if (matchedStocks != null && !matchedStocks.isEmpty()) {
+                        InvStock firstMatch = matchedStocks.get(0);
+                        log.debug("Matched stock {} for prdtId={}, patName={}", 
+                            firstMatch.getStockId(), sample.getPrdtId(), sample.getPatName());
+                    }
                 }
 
                 // 6c. Calculate net = total - available
@@ -325,6 +337,19 @@ public class MrpEngineService {
             order.setSourceDemandId(dto.getSourceDemandId());
             order.setSourceDemandLine(dto.getSourceDemandLine());
             order.setContractNo(dto.getContractNo());
+            order.setIsCategoryBom(dto.getIsCategoryBom());
+            order.setRawCategoryCode(dto.getRawCategoryCode());
+            order.setRawWidthMin(dto.getRawWidthMin());
+            order.setRawWidthMax(dto.getRawWidthMax());
+            order.setRawThicknessMin(dto.getRawThicknessMin());
+            order.setRawThicknessMax(dto.getRawThicknessMax());
+            order.setRawGradeCode(dto.getRawGradeCode());
+            order.setRawOriginCode(dto.getRawOriginCode());
+            order.setMatchedStockId(dto.getMatchedStockId());
+            order.setMatchedCoilNo(dto.getMatchedCoilNo());
+            order.setMatchedGradeCode(dto.getMatchedGradeCode());
+            order.setMatchedOriginCode(dto.getMatchedOriginCode());
+            order.setMatchStatus(dto.getMatchStatus());
             order.setOrderStatus("PLANNED");
             order.setIsFirmed(false);
             order.setCreatedTime(new Date());
@@ -529,6 +554,26 @@ public class MrpEngineService {
                         childOrder.setRawThicknessMin(spec.getThicknessMin());
                         childOrder.setRawThicknessMax(spec.getThicknessMax());
                         childOrder.setPlannedWeight(spec.getWeightPerUnit());
+                    }
+
+                    // For category BOM child orders, try to match stock
+                    if (Boolean.TRUE.equals(childOrder.getIsCategoryBom()) && childOrder.getRawCategoryCode() != null) {
+                        List<InvStock> potentialMatches = stockMapper.selectByMaterialWithAnyGradeOrigin(childOrder.getPrdtId());
+                        if (potentialMatches != null) {
+                            for (InvStock ps : potentialMatches) {
+                                if (childOrder.getPatName() != null && childOrder.getPatName().equals(ps.getPatName())) {
+                                    childOrder.setMatchedStockId(ps.getStockId());
+                                    childOrder.setMatchedCoilNo(ps.getResNo());
+                                    childOrder.setMatchedGradeCode(ps.getPatName());
+                                    childOrder.setMatchedOriginCode(ps.getPaName());
+                                    childOrder.setMatchStatus("MATCHED");
+                                    break;
+                                }
+                            }
+                        }
+                        if (childOrder.getMatchStatus() == null) {
+                            childOrder.setMatchStatus("UNMATCHED");
+                        }
                     }
 
                     context.addPlannedOrder(childOrder);
