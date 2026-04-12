@@ -153,14 +153,19 @@ public class ScheduleScorerService {
     }
 
     private Date findEarliestAvailable(Long wcId) {
-        List<ApsScheduleOper> opers = scheduleOperMapper.selectList(
-                new LambdaQueryWrapper<ApsScheduleOper>()
-                        .eq(ApsScheduleOper::getWcId, wcId)
-                        .isNotNull(ApsScheduleOper::getOperEnd)
-                        .orderByDesc(ApsScheduleOper::getOperEnd)
-                        .last("LIMIT 1"));
-        if (opers != null && !opers.isEmpty() && opers.get(0).getOperEnd() != null) {
-            return opers.get(0).getOperEnd();
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ApsScheduleOper> page =
+            new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 1);
+        LambdaQueryWrapper<ApsScheduleOper> wrapper = new LambdaQueryWrapper<ApsScheduleOper>()
+            .eq(ApsScheduleOper::getWcId, wcId)
+            .isNotNull(ApsScheduleOper::getOperEnd)
+            .orderByDesc(ApsScheduleOper::getOperEnd);
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ApsScheduleOper> result =
+            scheduleOperMapper.selectPage(page, wrapper);
+        if (result.getRecords() != null && !result.getRecords().isEmpty()) {
+            Date lastEnd = result.getRecords().get(0).getOperEnd();
+            if (lastEnd != null && lastEnd.after(new Date())) {
+                return lastEnd;
+            }
         }
         return new Date();
     }

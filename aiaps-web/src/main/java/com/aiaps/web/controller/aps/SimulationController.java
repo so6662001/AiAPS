@@ -4,7 +4,6 @@ import com.aiaps.common.result.R;
 import com.aiaps.service.aps.SimulationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.Map;
 
 @RestController
@@ -15,20 +14,19 @@ public class SimulationController {
     private final SimulationService simulationService;
 
     @PostMapping
-    public R<Map<String, Object>> createSimulation(
-            @RequestParam Long scheduleId,
-            @RequestParam String operationType,
-            @RequestBody(required = false) Map<String, Object> params) {
+    public R<Map<String, Object>> create(@RequestBody Map<String, Object> params) {
+        Long scheduleId = Long.valueOf(params.get("scheduleId").toString());
+        String operationType = (String) params.get("operationType");
         return R.ok(simulationService.createSimulation(scheduleId, operationType, params));
     }
 
-    @PostMapping("/{snapshotId}/apply")
-    public R<Map<String, Object>> applySimulation(@PathVariable Long snapshotId) {
-        return R.ok(simulationService.applySimulation(snapshotId));
+    @PostMapping("/{simId}/apply")
+    public R<Map<String, Object>> apply(@PathVariable Long simId) {
+        return R.ok(simulationService.applySimulation(simId));
     }
 
-    @PostMapping("/{snapshotId}/discard")
-    public R<Map<String, Object>> discardSimulation(@PathVariable Long snapshotId) {
-        return R.ok(simulationService.discardSimulation(snapshotId));
+    @PostMapping("/{simId}/discard")
+    public R<Map<String, Object>> discard(@PathVariable Long simId) {
+        return R.ok(simulationService.discardSimulation(simId));
     }
 }

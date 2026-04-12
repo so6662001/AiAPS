@@ -14,6 +14,7 @@ import com.aiaps.mapper.base.BasMaterialMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,9 @@ public class SmartSwapService {
     private final ApsScheduleOperMapper scheduleOperMapper;
     private final InvStockMapper invStockMapper;
     private final BasMaterialMapper materialMapper;
+
+    @Autowired
+    private ScheduleModificationService modificationService;
 
     private static final BigDecimal DEFAULT_VIOLATION_COST = BigDecimal.valueOf(5000);
 
@@ -159,6 +163,10 @@ public class SmartSwapService {
         scheduleMapper.updateById(current);
         scheduleMapper.updateById(matching);
 
+        // Record change logs
+        modificationService.recordChangeLog("SCHEDULE", currentScheduleId, current.getScheduleNo(), "MOVE", "SYSTEM", "智能调单: 与" + matching.getScheduleNo() + "互换", null);
+        modificationService.recordChangeLog("SCHEDULE", matchingScheduleId, matching.getScheduleNo(), "MOVE", "SYSTEM", "智能调单: 与" + current.getScheduleNo() + "互换", null);
+
         Map<String, Object> result = new HashMap<>();
         result.put("currentScheduleId", currentScheduleId);
         result.put("matchingScheduleId", matchingScheduleId);
@@ -183,6 +191,9 @@ public class SmartSwapService {
 
         for (ApsSchedule candidate : candidates) {
             if (candidate.getScheduleId().equals(current.getScheduleId())) continue;
+
+            // Must be same product (same physical material spec to be interchangeable)
+            if (!Objects.equals(candidate.getPrdtId(), current.getPrdtId())) continue;
 
             boolean gradeOk = Objects.equals(candidate.getDemandGradeCode(), stockGrade);
             boolean originOk = Objects.equals(candidate.getDemandOriginCode(), stockOrigin);

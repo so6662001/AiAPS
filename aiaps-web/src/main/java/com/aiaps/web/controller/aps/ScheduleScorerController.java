@@ -49,4 +49,18 @@ public class ScheduleScorerController {
     public R<BasScheduleStrategy> getDefaultStrategy() {
         return R.ok(strategyMapper.selectDefault());
     }
+
+    @PostMapping("/strategy")
+    public R<Void> createStrategy(@RequestBody BasScheduleStrategy strategy) {
+        strategy.setIsActive(true);
+        strategyMapper.insert(strategy);
+        return R.ok();
+    }
+
+    @PutMapping("/strategy/{id}")
+    public R<Void> updateStrategy(@PathVariable Long id, @RequestBody BasScheduleStrategy strategy) {
+        strategy.setStrategyId(id);
+        strategyMapper.updateById(strategy);
+        return R.ok();
+    }
 }
