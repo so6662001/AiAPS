@@ -19,6 +19,7 @@ import com.aiaps.mapper.mrp.MrpPlanOrderMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,9 @@ import java.util.stream.Collectors;
 public class ScheduleEngineService {
 
     private final ApsScheduleMapper scheduleMapper;
+
+    @Autowired
+    private ScheduleModificationService modificationService;
     private final ApsScheduleOperMapper scheduleOperMapper;
     private final BasWorkCenterMapper workCenterMapper;
     private final BasMoldMapper moldMapper;
@@ -175,6 +179,8 @@ public class ScheduleEngineService {
             throw new BizException("排程已锁定, 无法移动: " + scheduleId);
         }
 
+        modificationService.createSnapshot(Arrays.asList(scheduleId), "AUTO", "移动排产前自动快照", null);
+
         Long effectiveWcId = newWcId;
 
         if (newStart != null) {
@@ -245,6 +251,8 @@ public class ScheduleEngineService {
                 }
             }
         }
+
+        modificationService.recordChangeLog("SCHEDULE", scheduleId, schedule.getScheduleNo(), "MOVE", "USER", null, null);
     }
 
     @Transactional
