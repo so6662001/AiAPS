@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.base.BasSubstituteRuleMapper">
+
+    <select id="selectByTypeAndSource" resultType="com.aiaps.domain.base.BasSubstituteRule">
+        SELECT *
+        FROM bas_substitute_rule
+        WHERE rule_type = #{ruleType}
+          AND is_active = 1
+          <if test="sourceCategory != null and sourceCategory != ''">
+              AND source_category = #{sourceCategory}
+          </if>
+          <if test="sourceGradeCode != null and sourceGradeCode != ''">
+              AND source_PATName = #{sourceGradeCode}
+          </if>
+        ORDER BY priority
+    </select>
+
+</mapper>
