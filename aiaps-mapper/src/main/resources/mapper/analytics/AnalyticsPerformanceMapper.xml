@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.analytics.AnalyticsPerformanceMapper">
+
+    <select id="selectRecentByPath" resultType="com.aiaps.domain.analytics.AnalyticsPerformance">
+        SELECT *
+        FROM analytics_performance
+        WHERE source_type = #{sourceType}
+          AND record_time &gt;= DATEADD(MINUTE, -#{minutes}, GETDATE())
+          <if test="path != null and path != ''">
+              AND (page_path = #{path} OR api_path = #{path})
+          </if>
+        ORDER BY record_time DESC
+    </select>
+
+</mapper>

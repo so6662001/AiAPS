@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
+import { initTracker, trackPageEnter } from '@/utils/tracker'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -109,6 +110,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/report/ContractProgressView.vue'),
         meta: { title: '合同进度' },
       },
+      {
+        path: 'analytics',
+        name: 'Analytics',
+        component: () => import('@/views/analytics/AnalyticsDashboardView.vue'),
+        meta: { title: '数据分析' },
+      },
     ],
   },
   {
@@ -130,6 +137,12 @@ router.beforeEach((to, _from, next) => {
   } else {
     next()
   }
+})
+
+initTracker()
+
+router.afterEach((to) => {
+  trackPageEnter(to.path)
 })
 
 export default router

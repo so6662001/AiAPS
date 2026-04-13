@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { trackApiPerformance } from './tracker'
 
 const request = axios.create({
   baseURL: '/api',
@@ -12,6 +13,7 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    ;(config as any).metadata = { startTime: Date.now() }
     return config
   },
   (error) => Promise.reject(error)
@@ -19,6 +21,8 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
+    const duration = Date.now() - ((response.config as any).metadata?.startTime || 0)
+    trackApiPerformance(response.config.method?.toUpperCase() || 'GET', response.config.url || '', duration, response.status, false)
     const res = response.data
     if (res.code !== undefined && res.code !== 200) {
       ElMessage.error(res.message || '请求失败')
@@ -31,6 +35,8 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
+    const duration = Date.now() - ((error.config as any)?.metadata?.startTime || 0)
+    trackApiPerformance(error.config?.method?.toUpperCase() || 'GET', error.config?.url || '', duration, error.response?.status || 0, true)
     if (error.response) {
       const status = error.response.status
       if (status === 401) {

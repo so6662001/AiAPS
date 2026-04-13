@@ -70,6 +70,10 @@
             <el-icon><TrendCharts /></el-icon>
             <template #title>合同进度</template>
           </el-menu-item>
+          <el-menu-item index="/analytics">
+            <el-icon><DataAnalysis /></el-icon>
+            <template #title>数据分析</template>
+          </el-menu-item>
         </el-menu>
       </el-scrollbar>
     </el-aside>
@@ -112,7 +116,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   Monitor, Setting, Document, Cpu, Calendar, Box,
-  DataLine, Search, TrendCharts, Fold, Expand, Bell,
+  DataLine, Search, TrendCharts, Fold, Expand, Bell, DataAnalysis,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
