@@ -119,6 +119,12 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    path: '/agreement/sign',
+    name: 'AgreementSign',
+    component: () => import('@/views/system/AgreementSignView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('../views/error/NotFoundView.vue'),
@@ -135,6 +141,9 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresAuth !== false && !token) {
     next('/login')
   } else {
+    if (to.path !== '/login' && to.path !== '/agreement/sign' && to.meta.requiresAuth !== false) {
+      // Agreement check would be done here in production
+    }
     next()
   }
 })
