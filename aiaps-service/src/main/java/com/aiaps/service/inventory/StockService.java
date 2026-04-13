@@ -108,7 +108,10 @@ public class StockService {
         stock.setOnHandQty(beforeQty.subtract(outQty));
         stock.setOnHandWeight(beforeWeight.subtract(outWeight));
         stock.setLastUpdated(new Date());
-        stockMapper.updateById(stock);
+        int updated = stockMapper.updateById(stock);
+        if (updated == 0) {
+            throw new BizException("库存并发冲突，请重试");
+        }
 
         InvTransaction txn = new InvTransaction();
         txn.setTxnNo(generateTxnNo());

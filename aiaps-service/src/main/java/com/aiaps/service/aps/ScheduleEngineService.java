@@ -44,7 +44,7 @@ public class ScheduleEngineService {
     private final BasRoutingHeadMapper routingHeadMapper;
     private final BasMaterialMapper materialMapper;
 
-    private int scheduleSeq = 0;
+    private final java.util.concurrent.atomic.AtomicInteger scheduleSeq = new java.util.concurrent.atomic.AtomicInteger(0);
 
     @Transactional
     public List<ApsSchedule> autoSchedule(List<Long> planOrderIds, String strategy) {
@@ -455,8 +455,8 @@ public class ScheduleEngineService {
     }
 
     private String generateScheduleNo() {
-        scheduleSeq++;
-        return String.format("SCH-%tY%<tm%<td-%04d", new Date(), scheduleSeq);
+        int seq = scheduleSeq.incrementAndGet();
+        return String.format("SCH-%tY%<tm%<td-%06d", new Date(), seq);
     }
 
     private String inferOutputFlowType(BasMaterial material) {

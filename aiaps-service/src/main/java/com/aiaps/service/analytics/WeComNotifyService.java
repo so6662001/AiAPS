@@ -3,6 +3,7 @@ package com.aiaps.service.analytics;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.aiaps.common.exception.BizException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,15 @@ import java.util.Map;
 public class WeComNotifyService {
 
     public void sendMarkdown(String webhookUrl, String content) {
+        // Validate webhook URL to prevent SSRF
+        if (webhookUrl == null || webhookUrl.isEmpty()) {
+            log.warn("企业微信webhook URL为空，跳过发送");
+            return;
+        }
+        if (!webhookUrl.startsWith("https://qyapi.weixin.qq.com/")) {
+            log.error("无效的企业微信webhook URL: {}", webhookUrl);
+            throw new BizException("无效的企业微信webhook URL，必须以 https://qyapi.weixin.qq.com/ 开头");
+        }
         try {
             JSONObject body = new JSONObject();
             body.set("msgtype", "markdown");
