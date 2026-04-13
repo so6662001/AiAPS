@@ -508,7 +508,357 @@ GET  /api/v1/analytics/role-usage         # A8 角色使用对比
 
 ---
 
-## 6. 数据隐私与合规
+## 6. 性能监控与企业微信告警
+
+### 6.1 性能监控指标
+
+```
+监控三类性能问题:
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  类型1: 页面加载慢                                               │
+  │                                                                 │
+  │  采集: 前端 Performance API                                      │
+  │  指标:                                                          │
+  │    · 首屏加载时间 (FCP, First Contentful Paint)                  │
+  │    · 页面完全加载时间 (Load)                                     │
+  │    · 最大内容渲染时间 (LCP, Largest Contentful Paint)             │
+  │  阈值:                                                          │
+  │    · FCP > 3秒 → 黄色预警                                       │
+  │    · FCP > 5秒 → 红色告警                                       │
+  │    · LCP > 5秒 → 黄色预警                                       │
+  │    · LCP > 8秒 → 红色告警                                       │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  类型2: API接口慢                                                │
+  │                                                                 │
+  │  采集: Axios 拦截器记录请求耗时                                   │
+  │  指标:                                                          │
+  │    · 接口响应时间 (从请求发出到响应返回)                           │
+  │  阈值(按接口类型差异化):                                         │
+  │    · 普通查询接口 > 2秒 → 预警, > 5秒 → 告警                    │
+  │    · MRP运算接口  > 60秒 → 预警, > 120秒 → 告警                 │
+  │    · 排产接口     > 15秒 → 预警, > 30秒 → 告警                  │
+  │    · 追溯查询     > 3秒  → 预警, > 10秒 → 告警                  │
+  │    · 接口错误率   > 5%   → 预警, > 10% → 告警                   │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  类型3: 页面交互卡顿                                             │
+  │                                                                 │
+  │  采集: Long Task API / FID (First Input Delay)                   │
+  │  指标:                                                          │
+  │    · 长任务 (>50ms的JS执行)                                      │
+  │    · 首次输入延迟                                                │
+  │  阈值:                                                          │
+  │    · 单页面长任务 > 10次/分钟 → 预警                              │
+  │    · FID > 300ms → 告警                                         │
+  └─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.2 性能数据表 (analytics_performance)
+
+```sql
+CREATE TABLE analytics_performance (
+    perf_id             BIGINT IDENTITY(1,1) PRIMARY KEY,
+    
+    -- ═══ 来源 ═══
+    source_type         VARCHAR(10)   NOT NULL,     -- PAGE=页面 API=接口
+    user_id             VARCHAR(50)   NULL,
+    session_id          VARCHAR(60)   NULL,
+    
+    -- ═══ 页面性能 (source_type=PAGE) ═══
+    page_path           VARCHAR(200)  NULL,
+    fcp_ms              INT           NULL,         -- 首屏加载(ms)
+    lcp_ms              INT           NULL,         -- 最大内容渲染(ms)
+    fid_ms              INT           NULL,         -- 首次输入延迟(ms)
+    load_ms             INT           NULL,         -- 完全加载(ms)
+    long_task_count     INT           NULL,         -- 长任务数
+    
+    -- ═══ API性能 (source_type=API) ═══
+    api_path            VARCHAR(200)  NULL,         -- 接口路径
+    api_method          VARCHAR(10)   NULL,         -- GET/POST/PUT
+    response_ms         INT           NULL,         -- 响应时间(ms)
+    http_status         INT           NULL,         -- HTTP状态码
+    is_error            BIT           NOT NULL DEFAULT 0,
+    error_message       NVARCHAR(500) NULL,
+    
+    -- ═══ 告警 ═══
+    alert_level         VARCHAR(10)   NULL,         -- NORMAL/WARNING/CRITICAL
+    alert_sent          BIT           NOT NULL DEFAULT 0,  -- 是否已发送告警
+    
+    -- ═══ 时间 ═══
+    record_time         DATETIME      NOT NULL DEFAULT GETDATE()
+);
+
+CREATE INDEX IX_perf_time ON analytics_performance(record_time);
+CREATE INDEX IX_perf_page ON analytics_performance(page_path, record_time);
+CREATE INDEX IX_perf_api ON analytics_performance(api_path, record_time);
+CREATE INDEX IX_perf_alert ON analytics_performance(alert_level, alert_sent);
+```
+
+### 6.3 告警规则配置表 (analytics_alert_rule)
+
+```sql
+CREATE TABLE analytics_alert_rule (
+    rule_id             BIGINT IDENTITY(1,1) PRIMARY KEY,
+    rule_name           NVARCHAR(100) NOT NULL,     -- 规则名称
+    rule_type           VARCHAR(20)   NOT NULL,     -- PAGE_LOAD/API_SLOW/API_ERROR/INTERACTION
+    
+    -- ═══ 匹配条件 ═══
+    match_path          VARCHAR(200)  NULL,         -- 匹配路径(NULL=全部)
+    match_method        VARCHAR(10)   NULL,         -- 匹配方法
+    
+    -- ═══ 阈值 ═══
+    warning_threshold   INT           NOT NULL,     -- 预警阈值(ms或次数或百分比×100)
+    critical_threshold  INT           NOT NULL,     -- 告警阈值
+    threshold_unit      VARCHAR(10)   NOT NULL,     -- MS=毫秒 COUNT=次数 PCT=百分比
+    
+    -- ═══ 触发条件 ═══
+    window_minutes      INT           NOT NULL DEFAULT 5,   -- 统计窗口(分钟)
+    min_sample_count    INT           NOT NULL DEFAULT 3,   -- 最小样本数(避免误报)
+    
+    -- ═══ 通知 ═══
+    notify_wecom        BIT           NOT NULL DEFAULT 1,   -- 是否推送企业微信
+    notify_webhook_url  NVARCHAR(500) NULL,                 -- 企业微信Webhook地址
+    notify_interval_min INT           NOT NULL DEFAULT 30,  -- 最小通知间隔(分钟, 防刷)
+    last_notify_time    DATETIME      NULL,                 -- 上次通知时间
+    
+    is_active           BIT           NOT NULL DEFAULT 1
+);
+
+-- 预置规则示例:
+-- 普通页面加载 FCP>3000ms预警 FCP>5000ms告警
+-- MRP接口 响应>60000ms预警 >120000ms告警
+-- 排产接口 响应>15000ms预警 >30000ms告警
+-- 追溯查询 响应>3000ms预警 >10000ms告警
+-- 全局API错误率 >5%预警 >10%告警
+```
+
+### 6.4 企业微信Webhook推送
+
+```
+企业微信机器人配置:
+
+  1. 在企业微信群中添加机器人 → 获取 Webhook URL
+     格式: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxx
+
+  2. 系统配置:
+     analytics_alert_rule.notify_webhook_url = 上述URL
+     或全局配置: sys_config.wecom_perf_webhook = URL
+
+  3. 推送消息格式:
+```
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  企业微信告警消息格式                                          │
+│                                                              │
+│  🔴 AiAPS 性能告警                                           │
+│  ──────────────────                                          │
+│  告警级别: 严重 (CRITICAL)                                    │
+│  告警类型: API接口响应超时                                     │
+│  接口: POST /api/v1/mrp/run                                  │
+│  响应时间: 135秒 (阈值: 120秒)                                │
+│  影响用户: 张三 (计划员)                                      │
+│  发生时间: 2026-03-17 14:35:22                                │
+│  最近5分钟: 3次超时 / 5次请求                                  │
+│  ──────────────────                                          │
+│  建议: 检查MRP运算数据量或数据库性能                           │
+│                                                              │
+│                                                              │
+│  🟡 AiAPS 性能预警                                           │
+│  ──────────────────                                          │
+│  告警级别: 预警 (WARNING)                                     │
+│  告警类型: 页面加载缓慢                                       │
+│  页面: /schedule (排产甘特图)                                  │
+│  首屏加载: 4.2秒 (阈值: 3秒)                                  │
+│  影响用户: 5人 (最近5分钟)                                     │
+│  发生时间: 2026-03-17 14:30:15                                │
+│  ──────────────────                                          │
+│  建议: 检查甘特图数据量或前端渲染性能                          │
+│                                                              │
+│                                                              │
+│  🔴 AiAPS 错误率告警                                          │
+│  ──────────────────                                          │
+│  告警级别: 严重 (CRITICAL)                                    │
+│  告警类型: API错误率异常                                       │
+│  接口: GET /api/v1/stock                                     │
+│  错误率: 12.5% (阈值: 10%)                                   │
+│  最近5分钟: 5次错误 / 40次请求                                 │
+│  错误信息: "Connection refused" ×3, "Timeout" ×2              │
+│  发生时间: 2026-03-17 15:02:33                                │
+│  ──────────────────                                          │
+│  建议: 检查数据库连接或网络状态                                │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 6.5 告警处理流程
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  性能告警处理流程                                                │
+│                                                                 │
+│  前端/后端 采集性能数据                                          │
+│       │                                                         │
+│       ▼                                                         │
+│  上报到 analytics_performance 表                                 │
+│       │                                                         │
+│       ▼                                                         │
+│  告警检测服务 (每分钟执行一次)                                    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  1. 读取所有 is_active=true 的告警规则                    │    │
+│  │  2. 对每条规则:                                          │    │
+│  │     a. 查询最近 window_minutes 内的性能数据               │    │
+│  │     b. 计算: 平均值 / 最大值 / 错误率                     │    │
+│  │     c. 对比阈值: > critical → CRITICAL                   │    │
+│  │                  > warning → WARNING                     │    │
+│  │                  否则 → NORMAL                           │    │
+│  │  3. 如果触发告警:                                        │    │
+│  │     a. 检查 last_notify_time (防止频繁发送)               │    │
+│  │     b. 距上次通知 > notify_interval_min → 发送            │    │
+│  │     c. 调用企业微信 Webhook 推送                          │    │
+│  │     d. 更新 last_notify_time                             │    │
+│  │     e. 记录告警历史                                      │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│       │                                                         │
+│       ▼                                                         │
+│  企业微信群 接收告警                                              │
+│  ├── 研发团队群: 接收页面加载+交互卡顿告警                       │
+│  ├── 运维团队群: 接收API超时+错误率告警                          │
+│  └── 产品团队群: 接收每日性能汇总报告                            │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.6 企业微信Webhook调用方式
+
+```java
+/**
+ * 企业微信机器人推送服务
+ */
+public class WeComNotifyService {
+    
+    /**
+     * 发送Markdown格式的告警消息到企业微信群
+     * 
+     * @param webhookUrl  机器人Webhook地址
+     * @param content     Markdown内容
+     */
+    public void sendAlert(String webhookUrl, String title, String content) {
+        // POST请求体:
+        // {
+        //   "msgtype": "markdown",
+        //   "markdown": {
+        //     "content": "## 🔴 AiAPS 性能告警\n> 告警级别: **严重**\n..."
+        //   }
+        // }
+        
+        Map<String, Object> body = new HashMap<>();
+        body.put("msgtype", "markdown");
+        
+        Map<String, String> markdown = new HashMap<>();
+        markdown.put("content", "## " + title + "\n" + content);
+        body.put("markdown", markdown);
+        
+        // 使用 RestTemplate 或 OkHttp 发送POST
+        restTemplate.postForEntity(webhookUrl, body, String.class);
+    }
+    
+    /**
+     * 构建告警消息内容
+     */
+    public String buildAlertContent(String alertLevel, String alertType,
+                                     String target, String currentValue,
+                                     String threshold, String suggestion) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("> 告警级别: **").append(alertLevel).append("**\n");
+        sb.append("> 告警类型: ").append(alertType).append("\n");
+        sb.append("> 目标: `").append(target).append("`\n");
+        sb.append("> 当前值: **").append(currentValue).append("**");
+        sb.append(" (阈值: ").append(threshold).append(")\n");
+        sb.append("> 时间: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())).append("\n");
+        sb.append("> 建议: ").append(suggestion);
+        return sb.toString();
+    }
+}
+```
+
+### 6.7 性能告警报表
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  性能监控中心                                      [今日] [本周]     │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─── 实时状态 ──────────────────────────────────────────────────┐ │
+│  │  页面健康度: 🟢 98.5%   API健康度: 🟡 95.2%   告警: 2条      │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  ┌─── 页面加载性能 (P95) ─────────────────────────────────────┐   │
+│  │                                                              │   │
+│  │  页面            FCP(ms)    LCP(ms)    状态                  │   │
+│  │  ─────────────────────────────────────────────               │   │
+│  │  Dashboard       450        800        🟢 正常               │   │
+│  │  排产甘特图      1,200      2,500      🟢 正常               │   │
+│  │  MRP工作台       800        1,500      🟢 正常               │   │
+│  │  库存查询        600        1,200      🟢 正常               │   │
+│  │  合并套料        1,500      3,200      🟡 偏慢               │   │
+│  │  追溯中心        900        1,800      🟢 正常               │   │
+│  │                                                              │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌─── API响应时间 (P95, 最近1小时) ───────────────────────────┐   │
+│  │                                                              │   │
+│  │  接口                     P95(ms)   错误率   状态            │   │
+│  │  ──────────────────────────────────────────────              │   │
+│  │  POST /v1/mrp/run         22,000    0%       🟢 正常        │   │
+│  │  POST /v1/schedule/auto    8,500    0%       🟢 正常        │   │
+│  │  GET  /v1/schedule/gantt   1,200    0%       🟢 正常        │   │
+│  │  GET  /v1/stock            800      0.5%     🟢 正常        │   │
+│  │  GET  /v1/trace/barcode    1,100    0%       🟢 正常        │   │
+│  │  POST /v1/nesting/multi    3,200    2%       🟡 偏慢        │   │
+│  │                                                              │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌─── 最近告警 ──────────────────────────────────────────────┐    │
+│  │  🔴 14:35 POST /v1/mrp/run 响应135s (阈值120s) → 已推送     │    │
+│  │  🟡 14:30 /schedule 首屏4.2s (阈值3s) → 已推送              │    │
+│  │  🟢 12:00 全部正常                                          │    │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.8 每日性能汇总推送 (企业微信)
+
+```
+每日 08:30 自动推送到产品团队群:
+
+  ┌──────────────────────────────────────────────────────────┐
+  │  📊 AiAPS 性能日报 (2026-03-17)                          │
+  │  ──────────────────────────                              │
+  │  页面健康度: **98.5%** (目标≥95%) ✅                      │
+  │  API健康度:  **95.2%** (目标≥99%) ⚠                      │
+  │                                                          │
+  │  **页面加载 Top3 慢:**                                    │
+  │  1. 合并套料 FCP=1.5s LCP=3.2s                           │
+  │  2. 排产甘特图 FCP=1.2s LCP=2.5s                         │
+  │  3. 追溯中心 FCP=0.9s LCP=1.8s                           │
+  │                                                          │
+  │  **API响应 Top3 慢:**                                     │
+  │  1. POST /v1/mrp/run P95=22s                             │
+  │  2. POST /v1/schedule/auto P95=8.5s                      │
+  │  3. POST /v1/nesting/multi P95=3.2s                      │
+  │                                                          │
+  │  **告警统计:**                                            │
+  │  严重(CRITICAL): 1次  预警(WARNING): 3次                  │
+  │                                                          │
+  │  **用户活跃:**                                            │
+  │  DAU=42  页面PV=3,250  操作次数=1,850                    │
+  └──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 7. 数据隐私与合规
 
 ```
 数据采集原则:
