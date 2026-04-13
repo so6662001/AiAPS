@@ -2,7 +2,7 @@
   <div class="dashboard-page">
     <!-- Stat Cards Row -->
     <el-row :gutter="16" class="stat-row">
-      <el-col :span="6" v-for="stat in statCards" :key="stat.title">
+      <el-col :span="6" :xs="12" v-for="stat in statCards" :key="stat.title">
         <el-card class="stat-card" shadow="never" :style="{ borderLeftColor: stat.color }">
           <el-statistic :title="stat.title" :value="stat.value" :precision="stat.precision" :suffix="stat.suffix">
             <template #prefix>
@@ -21,7 +21,7 @@
 
     <!-- Middle Row -->
     <el-row :gutter="16" class="middle-row">
-      <el-col :span="14">
+      <el-col :span="14" :xs="24">
         <el-card class="section-card" shadow="never">
           <template #header>
             <div class="card-header">
@@ -61,7 +61,7 @@
           </el-table>
         </el-card>
       </el-col>
-      <el-col :span="10">
+      <el-col :span="10" :xs="24">
         <el-card class="section-card" shadow="never">
           <template #header>
             <div class="card-header">

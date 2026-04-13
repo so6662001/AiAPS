@@ -1,6 +1,6 @@
 <template>
   <el-container class="layout-container">
-    <el-aside :width="sidebarCollapsed ? '64px' : '220px'" class="layout-sidebar">
+    <el-aside :width="sidebarCollapsed ? '64px' : '220px'" class="layout-sidebar" :class="{ 'mobile-open': mobileMenuOpen }">
       <div class="sidebar-logo">
         <img src="@/assets/vite.svg" alt="logo" class="logo-icon" />
         <span v-show="!sidebarCollapsed" class="logo-text">AiAPS</span>
@@ -80,6 +80,7 @@
     <el-container class="layout-main">
       <el-header class="layout-header">
         <div class="header-left">
+          <el-icon class="mobile-menu-btn" @click="toggleMobileMenu"><Menu /></el-icon>
           <el-icon class="collapse-btn" @click="toggleSidebar">
             <Fold v-if="!sidebarCollapsed" />
             <Expand v-else />
@@ -107,6 +108,7 @@
         <router-view />
       </el-main>
     </el-container>
+    <div class="mobile-overlay" :class="{ active: mobileMenuOpen }" @click="closeMobileMenu"></div>
   </el-container>
 </template>
 
@@ -116,7 +118,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   Monitor, Setting, Document, Cpu, Calendar, Box,
-  DataLine, Search, TrendCharts, Fold, Expand, Bell, DataAnalysis,
+  DataLine, Search, TrendCharts, Fold, Expand, Bell, DataAnalysis, Menu,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -137,6 +139,12 @@ const currentTitle = computed(() => (route.meta.title as string) || '')
 function toggleSidebar() {
   appStore.toggleSidebar()
 }
+
+const mobileMenuOpen = ref(false)
+const toggleMobileMenu = () => { mobileMenuOpen.value = !mobileMenuOpen.value }
+const closeMobileMenu = () => { mobileMenuOpen.value = false }
+
+router.afterEach(() => { mobileMenuOpen.value = false })
 </script>
 
 <style scoped lang="scss">
@@ -223,5 +231,17 @@ function toggleSidebar() {
   background: var(--bg-page);
   padding: 20px;
   overflow-y: auto;
+}
+
+.mobile-menu-btn {
+  display: none;
+  font-size: 22px;
+  cursor: pointer;
+  margin-right: 12px;
+}
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: block;
+  }
 }
 </style>

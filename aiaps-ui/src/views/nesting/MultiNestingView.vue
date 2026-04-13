@@ -135,7 +135,7 @@
 
       <el-row :gutter="16">
         <!-- 左: 方案图形化展示 -->
-        <el-col :span="14">
+        <el-col :span="14" :xs="24">
           <div class="visual-title">
             <span v-if="nestingMode === 'SLIT'">纵剪方案 (母卷 {{ nestingResult.sourceWidth }}mm)</span>
             <span v-else-if="nestingMode === 'LEVEL'">开平切割序列 (母卷 {{ nestingResult.sourceLength }}m)</span>
@@ -194,7 +194,7 @@
         </el-col>
 
         <!-- 右: 产出分配表 -->
-        <el-col :span="10">
+        <el-col :span="10" :xs="24">
           <div class="visual-title">产出分配与成本分摊</div>
           <el-table :data="nestingResult.allocations" size="small" border stripe show-summary :summary-method="getSummary">
             <el-table-column label="合同" prop="contractNo" width="80" />
@@ -543,4 +543,18 @@ const formatDate = (d: string) => d ? d.substring(5, 10) : ''
 .text-success { color: #10b981; font-weight: 700; }
 .text-warning { color: #f59e0b; font-weight: 700; }
 .text-danger { color: #ef4444; }
+
+@media (max-width: 768px) {
+  .nesting-body {
+    grid-template-columns: 1fr !important;
+  }
+  .mode-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mode-left, .mode-right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
 </style>
