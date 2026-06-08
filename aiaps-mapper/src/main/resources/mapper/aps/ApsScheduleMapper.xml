@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.aps.ApsScheduleMapper">
+
+    <select id="selectByContract" resultType="com.aiaps.domain.aps.ApsSchedule">
+        SELECT *
+        FROM aps_schedule
+        WHERE contract_no = #{contractNo}
+        ORDER BY schedule_start
+    </select>
+
+    <select id="selectQueueByWc" resultType="com.aiaps.domain.aps.ApsSchedule">
+        SELECT s.*
+        FROM aps_schedule s
+        INNER JOIN aps_schedule_oper so ON s.schedule_id = so.schedule_id
+        WHERE so.wc_id = #{wcId}
+          <if test="status != null and status != ''">
+              AND s.schedule_status = #{status}
+          </if>
+        ORDER BY so.sequence_in_wc
+    </select>
+
+</mapper>

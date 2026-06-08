@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.aps.ApsNestingPoolMapper">
+    <select id="selectByRunId" resultType="com.aiaps.domain.aps.ApsNestingPool">
+        SELECT * FROM aps_nesting_pool WHERE run_id = #{runId} ORDER BY merge_group_key, priority
+    </select>
+    <select id="selectByGroupKey" resultType="com.aiaps.domain.aps.ApsNestingPool">
+        SELECT * FROM aps_nesting_pool WHERE merge_group_key = #{groupKey} AND pool_status = #{status} ORDER BY priority, required_date
+    </select>
+    <select id="selectDistinctGroupKeys" resultType="java.lang.String">
+        SELECT DISTINCT merge_group_key FROM aps_nesting_pool WHERE pool_status = #{status} AND merge_group_key IS NOT NULL
+    </select>
+</mapper>

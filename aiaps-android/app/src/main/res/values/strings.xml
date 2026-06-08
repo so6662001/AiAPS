@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AiAPS车间终端</string>
+    <string name="toolbar_title">AiAPS 车间终端</string>
+
+    <!-- Main menu -->
+    <string name="menu_material_issue">上料扫码</string>
+    <string name="menu_production_report">生产报工</string>
+    <string name="menu_warehouse_receipt">入库确认</string>
+    <string name="menu_material_issue_desc">扫描物料条码，核验上料信息</string>
+    <string name="menu_production_report_desc">填报生产数量，提交报工数据</string>
+    <string name="menu_warehouse_receipt_desc">扫码入库，打印标签</string>
+
+    <!-- Activity titles -->
+    <string name="title_material_issue">上料扫码</string>
+    <string name="title_production_report">生产报工</string>
+    <string name="title_warehouse_receipt">入库确认</string>
+
+    <!-- Material issue -->
+    <string name="current_schedule">当前工单信息</string>
+    <string name="schedule_no">排产号</string>
+    <string name="product">产品</string>
+    <string name="grade">材质</string>
+    <string name="origin">产地</string>
+    <string name="contract_no">合同号</string>
+    <string name="scan_material">扫描物料</string>
+    <string name="scan_hint">点击扫描物料条码</string>
+    <string name="scanned_material_info">扫描物料信息</string>
+    <string name="res_no">卷号</string>
+    <string name="card_no">卡号</string>
+    <string name="material">物料</string>
+    <string name="weight">重量</string>
+    <string name="validation_result">校验结果</string>
+    <string name="contract_match">合同匹配</string>
+    <string name="grade_match">材质匹配</string>
+    <string name="spec_match">规格匹配</string>
+    <string name="confirm_issue">确认上料</string>
+    <string name="change_coil">换一卷</string>
+    <string name="matched">匹配</string>
+    <string name="not_matched">不匹配</string>
+
+    <!-- Production report -->
+    <string name="select_schedule">选择工单</string>
+    <string name="schedule_info">工单信息</string>
+    <string name="product_spec">产品规格</string>
+    <string name="length">长度</string>
+    <string name="mold">模具</string>
+    <string name="raw_material_usage">原料使用</string>
+    <string name="coil_no">卷号</string>
+    <string name="usage_weight">领用量(T)</string>
+    <string name="report_input">报工输入</string>
+    <string name="good_qty">合格数量</string>
+    <string name="good_weight">合格重量</string>
+    <string name="scrap_qty">废品数量</string>
+    <string name="scrap_weight">废品重量</string>
+    <string name="output_length">产出长度</string>
+    <string name="shift">班次</string>
+    <string name="shift_day">白班</string>
+    <string name="shift_mid">中班</string>
+    <string name="shift_night">夜班</string>
+    <string name="operator">操作员</string>
+    <string name="start_time">开工时间</string>
+    <string name="end_time">完工时间</string>
+    <string name="yield_info">成材率信息</string>
+    <string name="input_weight">投入重量</string>
+    <string name="output_weight">产出重量</string>
+    <string name="yield_rate">成材率</string>
+    <string name="submit_report">提交报工</string>
+    <string name="click_select_time">点击选择时间</string>
+
+    <!-- Warehouse receipt -->
+    <string name="scan_section">扫码区</string>
+    <string name="scan_produced_material">扫描成品条码</string>
+    <string name="receipt_info">入库信息</string>
+    <string name="source_schedule">来源排产单</string>
+    <string name="receipt_detail">入库明细</string>
+    <string name="receipt_qty">入库数量</string>
+    <string name="receipt_weight">入库重量</string>
+    <string name="theory_weight">理论重量</string>
+    <string name="actual_weight">过磅重量</string>
+    <string name="qc_status">质检状态</string>
+    <string name="qc_pass">合格</string>
+    <string name="qc_fail">不合格</string>
+    <string name="qc_exempt">免检</string>
+    <string name="target_warehouse">目标仓库</string>
+    <string name="bundle_info">捆包信息</string>
+    <string name="qty_per_bundle">每捆数量</string>
+    <string name="total_bundles">捆包总数</string>
+    <string name="remark1">备注1</string>
+    <string name="remark2">备注2</string>
+    <string name="confirm_receipt">确认入库</string>
+    <string name="print_label">打印标签</string>
+
+    <!-- Common -->
+    <string name="loading">加载中…</string>
+    <string name="error_network">网络错误，请检查连接</string>
+    <string name="success">操作成功</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="no_data">暂无数据</string>
+    <string name="select_hint">请选择</string>
+    <string name="input_hint">请输入</string>
+    <string name="print_not_available">打印功能暂未开放</string>
+</resources>

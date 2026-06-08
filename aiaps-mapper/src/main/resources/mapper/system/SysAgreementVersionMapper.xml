@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.system.SysAgreementVersionMapper">
+    <select id="selectCurrentByType" resultType="com.aiaps.domain.system.SysAgreementVersion">
+        SELECT * FROM sys_agreement_version WHERE agreement_type = #{type} AND is_current = 1
+    </select>
+</mapper>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aiaps.mapper.production.PrdReplenishMapper">
+
+    <select id="selectByScheduleId" resultType="com.aiaps.domain.production.PrdReplenish">
+        SELECT *
+        FROM prd_replenish
+        WHERE schedule_id = #{scheduleId}
+        ORDER BY requested_time
+    </select>
+
+</mapper>
