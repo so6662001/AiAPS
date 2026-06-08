@@ -79,6 +79,7 @@ aiaps-android/                     Android 原生 (Java)
 - **一分X套裁**：钢卷分剪优化（一维装箱算法），开平快速排产
 - **排产模拟推演**：What-If 沙盒模式，甘特图叠加对比，确认后才应用
 - **上料智能调单**：换料成本 vs 调单成本自动测算，推荐最优方案
+- **排产向导**：16 步排产流程重构为 3 步（选订单→配方案→排产确认），系统自动配料/排产、实时反算、影响预览，点击数减少约 70%
 - **合同号全链路**：贯穿需求→计划→排产→领料→报工→库存，窜料控制
 - **三级追溯**：卡号(批次)→捆包号(每件)→条码(每支管)，正向/反向/扫码追溯
 - **材质产地替代**：等级体系 + 客户差异化偏好 + 7级优先级匹配
@@ -106,7 +107,7 @@ aiaps-android/                     Android 原生 (Java)
 | 长度 | stock_length / product_length | 批次属性(非物料维度) |
 | 合同号 | contract_no | 贯穿全链路 |
 
-## 设计文档 (19份)
+## 设计文档 (23份)
 
 详细设计文档位于 `docs/design/` 目录：
 
@@ -132,6 +133,9 @@ aiaps-android/                     Android 原生 (Java)
 | 18 | [traceability-barcode](docs/design/18-traceability-barcode.md) | V1 | 三级标识(卡号→捆包→条码)、追溯关联表、追溯查询 |
 | 19 | [coldroll-galvanize-process](docs/design/19-coldroll-galvanize-process.md) | V1 | 冷板/镀锌板工艺(罩退炉台层位+酸轧联合PLTCM+镀锌花型) |
 | 20 | [multi-demand-nesting](docs/design/20-multi-demand-nesting.md) | V1 | 多客户需求合并套料(开平/分剪/剪切跨合同合并+二维排版) |
+| 21 | [page-tracking-analytics](docs/design/21-page-tracking-analytics.md) | V1 | 页面埋点与数据分析(用户行为采集+操作路径+数据看板) |
+| 22 | [scheduling-wizard](docs/design/22-scheduling-wizard.md) | V1 | 排产向导：16步→3步流程优化(系统自动配料/排产+实时反算+影响预览) |
+| 23 | [agreement-privacy-compliance](docs/design/23-agreement-privacy-compliance.md) | V1 | 用户协议/隐私协议/数据使用授权/版本管理/OSS存档/合规保障 |
 
 ## 设计演进历程
 

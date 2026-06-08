@@ -57,6 +57,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '计划订单' },
       },
       {
+        path: 'schedule/wizard',
+        name: 'SchedulingWizard',
+        component: () => import('@/views/schedule/SchedulingWizardView.vue'),
+        meta: { title: '排产向导' },
+      },
+      {
         path: 'schedule',
         name: 'ScheduleGantt',
         component: () => import('@/views/schedule/ScheduleGanttView.vue'),
